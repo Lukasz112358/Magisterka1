@@ -1,0 +1,866 @@
+\documentclass{article}
+\usepackage{listings}
+\usepackage[T1]{fontenc}
+\usepackage[]{algorithm2e}
+\usepackage{amsfonts}
+\usepackage{tikz}
+\usepackage{systeme}
+\usepackage{tcolorbox}
+\usepackage{bussproofs}
+\usepackage{bussproofs}
+\usepackage{longtable}
+\usepackage{caption}
+% Language setting
+% Replace `English' with e.g. `spanish' to change the document language
+\usepackage[english, polish]{babel}
+
+% Set page size and margins
+% Replace `letterpaper' with `a4paper' for UK/EU standard size
+\usepackage[letterpaper,top=2cm,bottom=2cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+
+% Useful packages
+\usepackage{amsmath}
+\usepackage{inconsolata}
+\usepackage{graphicx}
+\graphicspath{ {.} }
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+\usepackage{xcolor}
+\lstset { %
+    language=C++,
+    backgroundcolor=\color{black!5}, % set backgroundcolor
+    basicstyle=\footnotesize,% basic font setting
+}
+
+\begin{document}
+
+\begin{abstract}
+TODO
+\end{abstract}
+
+\begin{otherlanguage}{english}
+\begin{abstract}
+TODO
+\end{abstract}
+\end{otherlanguage}
+
+
+\newpage
+
+\tableofcontents
+
+
+\newpage
+
+\section{Wstęp}
+
+Dedukcja naturalna jest metodą dowodzenia twierdzń logicznych przez wychodzenie z pewnych założeń i modyfikowanie ich za pomocą
+ściśle zdefiniowanych reguł wnioskowania. 
+
+\begin{tcolorbox}[
+    colback=gray!5,
+    colframe=black,
+    fonttitle=\bfseries,
+    title=Definicja (sekwent)
+]
+Sekwentem nazywamy wyrażenie postaci
+\[
+\Gamma \vdash \varphi
+\]
+gdzie $\Gamma$ jest skończonym zbiorem formuł (zapisywanych po przecinku i bez nawiasów klamrowych) zwanym \emph{kontekstem},
+a $\varphi$ jest formułą zwaną \emph{tezą sekwentu}. Sekwent $\Gamma \vdash \varphi$ interpretujemy jako stwierdzenie, że jeśli założymy, że wszystkie formuły z $\Gamma$ są prawdziwe, 
+da się dowieść $\varphi$. W rachunku zdań w logice klasycznej, który będzie jedyną logiką w której się będziemy poruszać, zdanie prawdziwe we wszystkich wartościowaniach jest dowodliwe, tak więc $\Gamma \vdash \phi$ jest równoważne stwierdzeniu jeżeli wszystkie formuły kontekstu $\Gamma$ są prawdziwe to $\varphi$ jest prawdziwe.
+\end{tcolorbox}
+
+\begin{tcolorbox}[title=Definicja (reguła wnioskowania)]
+Regułą wnioskowania nazywamy schemat postaci
+\[
+\frac{S_1 \qquad S_2 \qquad \dots \qquad S_n}{S}(R)
+\]
+gdzie $S_1,\dots,S_n,S$ są sekwentami. Sekwenty $S_1,\dots,S_n$ nazywamy \emph{przesłankami reguły}, natomiast sekwent $S$ nazywamy \emph{konkluzją reguły}. $R$ to z kolei \emph{indeks reguły}, który służy do jej identyfikacji.
+\end{tcolorbox}
+
+Dowody w dedukcji naturalnej można utożsamiać z drzewami, których węzłami są sekwenty,
+ a krawędzie są indeksowane indeksami reguł wnioskowania.
+
+
+
+
+
+
+
+W nieniejszej pracy skupimy się na dowodzeniu twierdzeń w logice klasycznej z następującymi spójnikiami logicznymi: koniunkcją ($\land$), alternatywą ($\lor$), negacją ($\neg$) oraz implikacją ($\to$).
+regułami wnioskowania:
+\begin{center}
+\label{tab:rules}
+\[
+\begin{array}{c c}
+\displaystyle
+\overline{\ \varphi \vdash \varphi\ }\;(\mathrm{Ass})
+&
+\displaystyle
+\frac{\Gamma \vdash \varphi}{\Gamma,\psi \vdash \varphi}\;(\mathrm{W})
+\\[2.2ex]
+\displaystyle
+\frac{\Gamma,\varphi \vdash \psi}{\Gamma \vdash \varphi \to \psi}\;(\to I)
+&
+\displaystyle
+\frac{\Gamma_1 \vdash \varphi \to \psi \qquad \Gamma_2 \vdash \varphi}
+     {\Gamma_1,\Gamma_2 \vdash \psi}\;(\to E)
+\\[2.2ex]
+\displaystyle
+\frac{\Gamma,\varphi \vdash \bot}{\Gamma \vdash \neg\varphi}\;(\neg I)
+&
+\displaystyle
+\frac{\Gamma_1 \vdash \neg\varphi \qquad \Gamma_2 \vdash \varphi}
+     {\Gamma_1,\Gamma_2 \vdash \bot}\;(\neg E)
+\\[2.2ex]
+\displaystyle
+\frac{\Gamma_1 \vdash \varphi \qquad \Gamma_2 \vdash \psi}
+     {\Gamma_1,\Gamma_2 \vdash \varphi \wedge \psi}\;(\wedge I)
+&
+\displaystyle
+\frac{\Gamma \vdash \varphi \wedge \psi}{\Gamma \vdash \varphi}\;(\wedge E_1)
+\\[2.2ex]
+\displaystyle
+\frac{\Gamma \vdash \varphi}{\Gamma \vdash \varphi \vee \psi}\;(\vee I_1)
+&
+\displaystyle
+\frac{\Gamma \vdash \varphi \wedge \psi}{\Gamma \vdash \psi}\;(\wedge E_2)
+\\[2.2ex]
+\displaystyle
+\frac{\Gamma \vdash \psi}{\Gamma \vdash \varphi \vee \psi}\;(\vee I_2)
+&
+\displaystyle
+\frac{\Gamma_1 \vdash \varphi \vee \psi \qquad \Gamma_2,\varphi \vdash \rho \qquad \Gamma_3,\psi \vdash \rho}
+     {\Gamma_1,\Gamma_2,\Gamma_3 \vdash \rho}\;(\vee E)
+\\[2.2ex]
+\displaystyle
+\overline{\ \vdash \top\ }\;(\top I)
+&
+\displaystyle
+\frac{\Gamma \vdash \bot}{\Gamma \vdash \varphi}\;(\bot E)
+\\[2.2ex]
+\displaystyle
+\frac{\Gamma_1,\varphi \vdash \psi \qquad \Gamma_2,\psi \vdash \varphi}
+     {\Gamma_1,\Gamma_2 \vdash \varphi \leftrightarrow \psi}\;(\leftrightarrow I)
+&
+\displaystyle
+\frac{\Gamma_1 \vdash \varphi \leftrightarrow \psi \qquad \Gamma_2 \vdash \varphi}
+     {\Gamma_1,\Gamma_2 \vdash \psi}\;(\leftrightarrow E_1)
+\\[2.2ex]
+\displaystyle
+\frac{\Gamma_1 \vdash \varphi \leftrightarrow \psi \qquad \Gamma_2 \vdash \psi}
+     {\Gamma_1,\Gamma_2 \vdash \varphi}\;(\leftrightarrow E_2)
+&
+\displaystyle
+\frac{\Gamma,\neg\varphi \vdash \bot}{\Gamma \vdash \varphi}\;(\mathrm{RAA})
+\\[2.2ex]
+\displaystyle
+\frac{\Gamma \vdash \neg\neg\varphi}{\Gamma \vdash \varphi}\;(\neg\neg)
+&
+\displaystyle
+\overline{\ \vdash \varphi \vee \neg\varphi\ }\;(\mathrm{TND})
+
+\end{array}
+\]
+\captionof{table}{Reguły wnioskowania rozważanego systemu}
+\end{center}
+Oto przykładowy dowód w dedukcji naturalnej w notacji drzewiastej:
+
+
+\begin{prooftree}
+
+% Ass: a ∨ b ⊢ a ∨ b
+\AxiomC{}
+\RightLabel{$(\mathrm{Ass})$}
+\UnaryInfC{$a \vee b \vdash a \vee b$}
+
+% Ass: a ⊢ a
+\AxiomC{}
+\RightLabel{$(\mathrm{Ass})$}
+\UnaryInfC{$a \vdash a$}
+\RightLabel{$(\vee I_2)$}
+\UnaryInfC{$a \vdash b \vee a$}
+
+% Ass: b ⊢ b
+\AxiomC{}
+\RightLabel{$(\mathrm{Ass})$}
+\UnaryInfC{$b \vdash b$}
+\RightLabel{$(\vee I_1)$}
+\UnaryInfC{$b \vdash b \vee a$}
+
+% ∨E
+\RightLabel{$(\vee E)$}
+\TrinaryInfC{$a \vee b \vdash b \vee a$}
+
+% →I
+\RightLabel{$(\to I)$}
+\UnaryInfC{$\vdash (a \vee b) \to (b \vee a)$}
+
+\end{prooftree}
+
+
+
+
+
+
+Dużą zaletą dedukcji naturalnej jest to, że niejako symuluje ona sposób, w jaki ludzie przeprowadzają wnioskowanie, zarówno 
+w matematyce, jak i w codziennym życiu. Dowody mają swoją drzweiastą strukturę, którą można łatwo analizować.
+Inną zaletą tej metody jest jej uniwersalność. Dodając odpowiednie reguły wnioskowania
+możemy otrzymać dedukcję naturalną dla różnych systemów logicznych np logiki pierwszego i drugiego rzędu, czy logiki modalnej.
+Jeszcze jedną zaletą jest to, że w przypadku większości użytecznych dowodów jesteśmy w stanie uniknąć wykładniczo dużej złożoności 
+wielu innych systemów dowodzenia sprowadzających się do rozpatrzenia wszystkich możliwych przypadków.
+Z drugiej strony dedukcja naturalna jest trudna w zaitomatyzowaniu. Zwykle dowód przeprowadzamy z góry na dół, zaczynając od założeń i
+kończąc na tezie. Jednak nie zawsze jasne jest, którą regułę wnioskowania zastosować i co gorsza wyniki zastosowania niektórych reguł mogą zawierać
+podformuły których nie ma w przesłankach, lub jej wybór nie jest jednoznaczny. Np używając reguły 
+
+\[
+\displaystyle
+\frac{\Gamma \vdash \varphi}{\Gamma \vdash \varphi \vee \psi}\;(\vee I_1)
+\]
+w przesłance nie mamy informacji o formule $\psi$, która pojawi się w konkluzji. 
+Jednak podobieństwo dedukcji naturalnej do ludzkiego sposobu wnioskowania sprawia, oraz pewien dający się zauważyć porządek
+w zapisie dowodów sprawia, że gdzie klasyczna implementacja dedukcji naturalnej jest trudna, wydaje się ona dobrze nadawać
+do implementacji z użyciem metod sztucznej inteligencji, w tym modeli językowych o arhirtekturze transformerów.
+
+W niniejszej pracy przedstawimy implementację automatycznego systemu dowodzenia twierdzeń w logice klasycznej przy użyciu odpowiednio 
+wytrenowanego modelu nano-GPT oraz przedstawimy wyniki jego działania i jak dobrze radzi sobie z przeprowadzaniem dowodów. Konstrukcja
+systemu będzie opisana krok po kroku, zaczynając od zaprogrogramowania logicznej struktury systemu, tłumaczenia zapisu dowodu w formie 
+tekstowej na strukturę logiczną i sprawdzanie poprawności dowodu, generacja korpusu treningowego, trenowanie modelu oraz 
+kolejne etapy konstrukcj samego systemu dowodzenia(wybór możliwych linii, równoległość prowadzenia kilku ścieżek rozumowania, itp).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Notacja Ficha i jej interpretacja}
+
+Notacja Ficha jest sposobem zapisu z dowodów dedukcji naturalnej w formie tekstowej. Jest on wy-
+godny, ponieważ klasyczna metoda zapisywania drzew dowodu potrafi zajmować bardzo dużo miejsca
+i trudno użyć do niej modeli językowych. Notacja Ficha jest z kolei metodą zapisu dowodu w formie tekstu, gdzie każda linia w specyficzny sposób koduje sekwent uzyskany przez używanie reguł do sekwentów kodowanych w poprzednich liniach.
+
+Przyjmijmy, następującą funkcję:
+
+$$\texttt{Fitch(i)} :=\text{sekwent kodowany przez linię o indeksie } \texttt{i}$$ 
+oraz oznaczenie
+$$\texttt{s.conclusion} := \text{teza sekwentu } \texttt{s}$$
+$$\texttt{s.assumptions} := \text{kontekst sekwentu } \texttt{s}$$
+
+Linia dowodu w notacji Ficha można podzielić na 4 części: indeks linii, konkluzja sekwentu kodowanego przez tą linię, nazwa reguły wnioskowania i indeksy linii które używamy przy użyciu tej reguły.
+
+Poniżej przedstawimy interpretację poszczególnych reguł wnioskowania w notacji Ficha, a także ich odpowiedniki w notacji drzewiastej.
+\begin{center}
+\small
+\begin{longtable}{|p{0.42\textwidth}|p{0.48\textwidth}|}
+\hline
+\textbf{Notacja Fitcha} & \textbf{Notacja drzewiasta} \\
+\hline
+
+\texttt{i. $\phi$    assumption}
+&
+$$\displaystyle
+\overline{\ \texttt{$\phi\vdash\phi$}\ }\;(\mathrm{Ass})
+$$
+\\
+\hline
+\texttt{i. $\phi$ \quad   weakening, j}
+&
+$$\displaystyle
+\frac{\texttt{Fitch(j)}}{\texttt{Fitch(i)}}\;(W)
+$$
+\\
+\hline
+\texttt{j. $\phi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     k. $\psi \quad \dots$ 
+     \newline
+     $\dots$
+     \newline
+     i. $\phi \to \psi \quad$ →-introduction, j–k
+     }
+
+
+
+
+
+&
+$$\displaystyle
+\frac{\texttt{Fitch(k)}}{\texttt{Fitch(i)}}\;(\to I)
+$$
+\\
+\hline
+
+\texttt{j. $\phi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     k. $\bot \quad \dots$ 
+     \newline
+     $\dots$
+     \newline
+     i. $\neg \phi \quad$ ¬-introduction, j–k
+     }
+
+
+
+
+
+&
+$$\displaystyle
+\frac{\texttt{Fitch(k)}}{\texttt{Fitch(i)}}\;(\neg I)
+$$
+\\
+
+
+
+
+
+
+
+
+
+\hline
+
+\texttt{j. $\phi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     k.  $\phi \to \psi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     i. $\psi \qquad$ →-elimination k, j
+     }
+
+
+
+
+
+&
+$$\displaystyle
+\frac{\texttt{ Fitch(k) \quad Fitch(j)}}{\texttt{Fitch(i)}}\;(\to E)
+$$
+\\
+
+\hline
+
+\texttt{j. $ \neg \phi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     k.  $\phi  \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     i. $\bot \quad$ ¬-elimination, j, k
+     }
+
+
+
+
+
+&
+$$\displaystyle
+\frac{\texttt{ Fitch(j) \qquad Fitch(k)}}{\texttt{Fitch(i)}}\;(\neg E)
+$$
+\\
+
+\hline
+
+
+
+
+
+\texttt{j. $  \phi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     k.  $\psi  \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     i. $\phi \land \psi \quad$ $\wedge$-introduction, j, k}
+
+
+
+
+
+&
+$$\displaystyle
+\frac{\texttt{ Fitch(j) \quad Fitch(k)}}{\texttt{Fitch(i)}}\;(\wedge I)
+$$
+
+
+
+
+
+
+\\
+
+\hline
+
+
+
+\texttt{j. $  \phi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     i. $\phi \lor \psi \quad$ $\lor$-introduction1, j}
+&
+$$\displaystyle
+\frac{\texttt{Fitch(j)}}{\texttt{Fitch(i)}}\;(\lor I_1)
+$$
+\\
+
+\hline
+
+
+\texttt{j. $  \psi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     i. $\phi \lor \psi \quad$ $\lor$-introduction2, j}
+&
+$$\displaystyle
+\frac{\texttt{Fitch(j)}}{\texttt{Fitch(i)}}\;(\lor I_2)
+$$
+\\
+
+\hline
+
+
+
+
+
+
+
+
+\texttt{i. $\top \quad \top$-introduction}
+&
+$$\displaystyle
+\overline{\ \vdash \top\ }\;(\top I)$$
+\\
+
+\hline
+
+
+\texttt{j. $  \phi \land \psi  \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     i. $\phi \quad$ $\land$-elimination1, j}
+&
+$$\displaystyle
+\frac{\texttt{Fitch(j)}}{\texttt{Fitch(i)}}\;(\land E_1)
+$$
+\\
+
+\hline
+
+
+
+\texttt{j. $  \phi \land \psi  \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     i. $\psi \quad$ $\land$-elimination2, j}
+&
+$$\displaystyle
+\frac{\texttt{Fitch(j)}}{\texttt{Fitch(i)}}\;(\land E_2)
+$$
+\\
+
+\hline
+
+
+
+
+
+
+
+
+
+
+\texttt{j. $  \phi \lor \psi  \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     k.  $\rho  \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     l. $\rho  \quad  \dots$
+     \newline
+     $\dots$
+     \newline     i. $\rho \quad$ $\lor$-elimination, j, k, l}
+&
+$$
+\displaystyle
+\frac{\texttt{Fitch(j)} \qquad \texttt{Fitch(k)} \qquad \texttt{Fitch(l)}}
+     {\texttt{Fitch(i)}}\;(\vee E)
+$$
+     \\
+
+
+
+\hline
+
+\texttt{j. $  \bot \quad  \dots$
+     \newline
+     $\dots$
+     \newline     i. $\phi \quad$ $\bot$-elimination, j}
+&
+$$
+\displaystyle
+\frac{\texttt{Fitch(j)} }
+     {\texttt{Fitch(i)}}\;(\bot E)
+$$
+\\
+\hline
+
+
+
+
+
+
+\texttt{j. $\psi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     k. $ \phi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     i. $\phi \leftrightarrow \psi \quad $ $\leftrightarrow$-introduction, j, k}
+
+&
+
+$$\displaystyle
+\frac{\texttt{Fitch(j)\qquad Fitch(k)}}{\texttt{Fitch(i)}}\;(\leftrightarrow I)
+$$
+
+\\
+\hline
+
+
+\texttt{j. $\phi \leftrightarrow \psi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     k. $ \phi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     i. $\psi  \quad $ $\leftrightarrow$-elimination1, j, k}
+
+&
+
+$$\displaystyle
+\frac{\texttt{Fitch(j)\qquad Fitch(k)}}{\texttt{Fitch(i)}}\;(\leftrightarrow E_1)
+$$
+
+\\
+\hline
+
+
+
+
+
+
+\texttt{j. $\phi \leftrightarrow \psi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     k. $ \psi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     i. $\phi  \quad $ $\leftrightarrow$-elimination2, j, k}
+
+&
+
+$$\displaystyle
+\frac{\texttt{Fitch(j)\qquad Fitch(k)}}{\texttt{Fitch(i)}}\;(\leftrightarrow E_2)
+$$
+
+\\
+\hline
+
+
+
+\texttt{j. $\neg \phi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     k. $ \bot \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     i. $\phi  \quad $ RAA, j–k}
+
+&
+
+$$\displaystyle
+\frac{\texttt{Fitch(k)}}{\texttt{Fitch(i)}}\;{(\mathrm{RAA})}
+$$
+
+\\
+\hline
+
+
+
+\texttt{j. $\neg \neg \phi \quad  \dots$
+     \newline
+     $\dots$
+     \newline
+     i. $\phi  \quad $ $\neg\neg$-elimination, j}
+
+&
+
+$$\displaystyle
+\frac{\texttt{Fitch(j)}}{\texttt{Fitch(i)}}\;{(\neg\neg)}
+$$
+
+\\
+\hline
+
+
+
+
+\texttt{i. $\phi \lor \neg \phi \quad $}TND
+&
+$$\displaystyle
+\overline{\ \vdash \phi \lor \neg \phi\ }\;{(\mathrm{TND})}$$
+\\
+
+\hline
+
+
+
+
+
+
+
+\end{longtable}
+\end{center}
+
+Warto zwuważyć, że aby dowody były poprawne muszą być spełnione odpowiednie warunki dotyczące sekwentów do których się odwołujemy, wymuszone przez reguły wnioskowania. Np dla napisu:
+
+\texttt{
+     \newline
+j. $  \phi \lor \psi  \quad  \dots$
+\newline
+$\dots$
+\newline
+k.  $\rho  \quad  \dots$
+\newline
+$\dots$
+\newline
+l. $\rho  \quad  \dots$
+\newline
+$\dots$
+\newline     i. $\rho \quad$ $\lor$-elimination, j, k, l
+\newline}
+
+
+musi być spełnione
+
+\texttt{$\phi \in$ Fich(k).assumptions \quad} oraz \quad \texttt{$\psi \in$ Fich(l).assumptions}.
+
+
+\section{Ustawienie modelu}
+Bazą naszego systemu są klasy \texttt{Relation} o \texttt{Variable}. \texttt{Relation} reprezentuje relację, zawiera
+akceptowalne arności, nazwę relacji oraz metodę \texttt{toString}, która zwraca jej reprezentację tekstową. W naszym 
+modelu używamy jedynie zmiennych zdaniowych, więc wystarczyłoby jedynie użycie klasy reprezentacej zmienną
+jednak użycie klasy \texttt{Relation} pozwala na łatwe rozszerzenie modelu w przyszłości o predykaty wieloargumentowe.
+Dla uproszczenia zapisu dodajemy jednak dodajemy fukcję która wczytuje/wypisuje jedynie nazwy zmiennych i zmienną \texttt{x} interpretuje jako \texttt{'(x)}.
+
+
+Klasa \texttt{Variable} reprezentuje zmienną, którą dajemy jako argument do relacji. Zawiera ona nazwę zmiennej oraz metodę zwracającą jej reprezentację tekstową.
+
+
+Kolejną klasą jaką definiujemy jest klasa \texttt{Formula}, która reprezentuje formułę logiczną. Podstawową i 
+najprostszą formułą jest formuła \texttt{Atom}, której implementacja zawiera nazwę relacji którą reprezentuje oraz
+listę argumentów na których ona zachodzi. Poza formułą atomową mamy również klasy reprezentujące negację, 
+koniunkcję, alternatywę, implikację oraz równoważność. Klasy te zawiera swój typ oraz dwu lub jedno elementową
+listę podformuł w polu \texttt{Interior}.
+
+
+Kolejną zaimplementowaną klasą jest klasa \texttt{Context}, która reprezentuje kontekst dowodzenia, czyli zbiór
+aktualnie przyjętych formuł. Z powodów które zostaną wyjaśnione w dalszej części pracy \texttt{Context} podzieliliśmy, na dwie listy: \texttt{base\_context} czyli formuły które przyjmujemy za prawdziwe w kontekście całego segmentu dowodu, oraz \texttt{additional\_context}, czyli formuły, które mogą zmieniać się w każdej linii dowodu. Obiekty klasy \texttt{Context} możemy sumować ze sobą jak zbiory metodą \texttt{union}, a także odejmować element, lub inny kontekst metodą \texttt{remove}. Operacje te wpływają jednak jedynie na \texttt{additional\_context}, zaś \texttt{base\_context} pozostaje bez zmian. Aby dwa konteksty można było od siebie odjąć lub dodać, muszą mieć takie samo \texttt{base\_context}, w przeciwnym wypadku zostaje zwrócony \texttt{TypeError("Bad arguments")}.
+
+
+Sekwent reprezentuje klasa \texttt{LittleProblem}, która składa się z kontekstu w polu \texttt{assumptions} oraz tezy w polu \texttt{conclusion}.
+
+Kolejną klasą jest klasa \texttt{Rule}, która reprezentuje regułę wnioskowania. Dziedziczą po niej klasy
+
+\begin{itemize}
+    \item \texttt{Assumption}
+    \item \texttt{Weakening}
+    \item \texttt{ImplicationIntroduction}
+    \item \texttt{NegationIntroduction}
+    \item \texttt{ImplicationElimination}
+    \item \texttt{NegationElimination}
+    \item \texttt{ConjunctionIntroduction}
+    \item \texttt{DisjunctionIntroduction1}
+    \item \texttt{DisjunctionIntroduction2}
+    \item \texttt{TruthIntroduction}
+    \item \texttt{ConjunctionElimination1}
+    \item \texttt{ConjunctionElimination2}
+    \item \texttt{DisjunctionElimination}
+    \item \texttt{LieElimination}
+    \item \texttt{IffIntroduction}
+    \item \texttt{IffElimination1}
+    \item \texttt{IffElimination2}
+    \item \texttt{RAA}
+    \item \texttt{NegationOfNegation}
+    \item \texttt{TND}
+\end{itemize}
+, które reprezentują odpowiednie reguły wnioskowania. Każda z tych klas zawiera metodę \texttt{top\_down}, która bierze listę sekwentów będącymi przesłankami reguły. Niektóre reguły wymagają doatkowych niejednoznacznych argumentów. Np zgodnie z notacją w Tabeli \ref{tab:rules} reguła $\mathrm{(Ass)}$ wymaga znajomości formuły $\phi$ która może być dowolna, z kolei zastosowanie reguły $\mathrm{(RAA)}$, wymaga znajomości $\phi$, która jest dowolną formułą, której zanegowanie występuje w kontekście sekwentu podanego jako przesłanka. W takim wypadku podajemy te niejednoznaczne formuły, jako dodatkowy argument oprócz przesłanek. Również \texttt{base\_context} który zakładamy jako prawdziwy dla całego dowodu nie koniecznie da się wydedukować z listy przesłanek (chodzi o sytuacje dla reguł $\mathrm{(Ass)}$, $\mathrm{(TND)}$ i $(\top I$), gdzie lista przesłanek jest pusta. Wtedy konieczne jest podanie również bazowego kontekstu w formie listy formuł. Oprócz generacji konkluzji reguły \texttt{top\_down} sprawdza również, czy wszystkie podane argumenty są poprawne. Po pierwsze chodzi o to, czy \texttt{base\_context} kontekstów przesłanek są takie same, czy listy przesłanek mają odpowiednie długości i czy ich elementy są klasy \texttt{LittleProblem}. Kolejną kwestią jest to, czy argumenty, można faktycznie podstawić do danej reguły. Np czy dla reguły $\neg E$ teza pierwszej przesłanki jest negacją tezy drugiej przesłanki, lub  czy dla reguły $\mathrm{RAA}$ $\neg \phi$  jest w kontekście przesłanki, przy czym $\phi$ jest przechowywane w argumencie \texttt{phi} funkcji \texttt{top\_down} klasy \texttt{RAA}. Jeżeli argumenty nie spełniają odpowiednich warunków, zostaje zwrócony błąd \texttt{TypeError("Bad arguments")}.
+
+
+
+
+
+\section{Parsowanie dowodów w notacji Ficha}
+W celu kontroli poprawności dowodu w notacji Fitcha, jest on w programie parsowany do reprezentującej go struktury logicznej. Dowody reprezentujemy jako słownik, którego kluczami są indeksy linii, a wartościami obiekty klasy \texttt{structure\_of\_line\_top\_down}. Klasa ta zawiera pola \texttt{Key}, które reprezentuje indeks linii, \texttt{args\_keys}, które reprezentują indeksy linii, które są używane jako przesłanki, \texttt{rule}, które reprezentuje regułę wnioskowania, której używamy oraz, \texttt{LP}, które reprezentuje sekwent który koduje dana linia. Wartość \texttt{LP} jest generowana przez regule \texttt{top\_down} zastosowaną dla przesłanek reprezentowanych przez \texttt{args\_keys} i pozostałych argumentów 
+Funkcja \texttt{\_\_init\_\_} tej klasy bierze za argument \texttt{Key}, \texttt{arg\_keys}, \texttt{rule}, a także \texttt{Proof\_so\_far}, które zawiera sparsowany do formy słownika dotychczasowy dowód, który jest konieczny gdy chcemy odwoływać się do przesłanek, oraz \texttt{formula\_text}, która jest wyciągniętą z linii formułą w notacji infiksowej, z której będzie niekiedy konieczne dedukować argumenty nie będące przesłankami w regule \texttt{top\_down}. Ostatnim argumentem dla funkcji \texttt{\_\_init\_\_} jest \texttt{BaseCntext}, który jest przyjmowanym w danym dowodzie kontekstem bazowym.
+
+Funkcja \texttt{parseProof} tworzy słownik, w którym każdemu indeksowii linii jest przypisany odpowiedni obiekt typu \texttt{structure\_of\_line\_top\_down}. Funkcja ta jako argumenty przyjmuje dowód w notacji Fitcha w formie tekstowej, oraz używany w dowodzie kontekst bazowy. Funkcja ta wczytuje dowód linia po linii i aktualizuje słownik. Sprawdza również, czy formuła będąca konkluzją pola \texttt{LP}
+obiektu klasy \texttt{structure\_of\_line\_top\_down} odpowiadająca danej linii jest taka sama jak formuła zapisana w zapisie tekstowej tej linii. Jeżeli tak nie jest oznacza to, że dowód jest niepoprawny
+i zostaje zwrócony błąd \texttt{TypeError("Bad arguments")}.
+
+
+\section{Generowanie korpusu}
+
+\section{Trenowanie i kożystanie z modelu (NanoGPTBundle i te wszystkie funkcje z nim związane !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!, podkreślam WSZYSTKIE(liczenie prawdopodobieństwa, dodawanie tokenu, linii, trenowanie, dotrenowanie, ładowanie)!!!!)}
+
+
+\section{3 strategie}
+
+Celem tej pracy nie jest jedynie skonstruowanie modelu językowego generującego
+dowody w dedukcji naturalnej, lecz także zbudowanie systemu, który w pewnym stopniu
+naśladuje sposób, w jaki człowiek dochodzi do poprawnego dowodu. Sam model językowy
+może generować ciągi tekstu przypominające formalny dowód, jednak nie gwarantuje to
+ich poprawności logicznej. Z tego powodu każdy wygenerowany krok musi być na bieżąco
+weryfikowany przy użyciu opisanej wcześniej funkcji \texttt{parseProof}.
+
+Drugim problemem jest to, że konstruowanie dowodu rzadko ma charakter całkowicie
+liniowy. W praktyce często wymaga ono licznych prób, cofania się i wybierania innych
+ścieżek rozumowania, zanim zostanie znaleziony zapis końcowy. Dlatego druga wersja
+systemu rozszerza prostą generację kolejnych linii o mechanizm przeszukiwania
+przestrzeni możliwych kroków dowodowych.
+
+Wreszcie, dla trudniejszych twierdzeń samo lokalne przeszukiwanie kolejnych kroków
+może okazać się niewystarczające. System może trafiać na ślepe uliczki, ponieważ
+na początkowym etapie dowodu nie zawsze wiadomo, która strategia doprowadzi do celu.
+Z tego względu trzecia wersja systemu wprowadza możliwość rozbijania problemu na
+prostsze podproblemy, które następnie mogą zostać połączone odpowiednią regułą
+wnioskowania w rozwiązanie problemu wyjściowego.
+
+System był rozwijany etapami. Najprostsza wersja zajmuje się wyłącznie generowaniem
+kolejnych linii dowodu i sprawdzaniem ich poprawności. Druga wersja dodaje mechanizm
+przeszukiwania metodą prób i błędów. Ostateczna wersja rozszerza ten schemat o
+dekompozycję celu na podproblemy. Każda kolejna wersja wykorzystuje poprzednią jako
+komponent składowy. W dalszej części rozdziału omawiam kolejno wszystkie trzy strategie.
+
+Pierwsza wersja systemu zawiera się w funkcji \texttt{silliest\_generate\_proof}. Jej argumenty to \texttt{bundle} będący obiektem klasy \texttt{NanoGPTBundle} 
+którym będziemy generować tekst dowodu, \texttt{prompt} który jest zmienną tekstową, która koduje twierdzenie, które mamy udowodnić, i ewentualnie początek dowodu, 
+zmienna \texttt{temperature} typu \texttt{float}, która pozwala kontrolować poziom determinizmu generacji oraz zmienna \texttt{max\_new\_lines} typu \texttt{int}, która określa ile linii 
+dowodu chcemy wygenerować i zmienna \texttt{max\_failed\_attempts}, która oznacza ile maksymalnie kolejnych nieudanych prób dopisania linii dowodu akceptujemy. 
+Każdy prompt zaczyna się od słów \texttt{Prove that: } a następnie podana jest formuła rachunku zdań w formie infiksowej. Jeżeli kontekst bazowy w generowanym dowodzie ma być niepusty 
+to w drugiej linii znajdują się słowa:
+\texttt{assuming that: } po których wypisana jest pierwsza z formuł bazowego kontekstu. Kolejne formuły są wypisywane po przecinku i każda w nowej linii. 
+Następnie w kolejnych liniach jest dopisywany dowód.
+
+Dowód dopisujemy w pętli, która kończy się kiedy ostatnia linia koduje sekwent, który chcemy udowodnić, liczba nowych linii przekracza \texttt{max\_new\_lines} lub ilość kolejnych nieudanych prób dopisania 
+linii dowodu przekracza \texttt{max\_failed\_attempts}. W każdej iteracji pętli próbujemy dodać jedną linię dowodu. Linia jest odrzucana jeżeli występują w niej zmienne inne niż w docelowym sekwencie, linia nie spełnia
+warunków składniowych  lub jeśli 
+parsowanie dowodu z nową linią zwraca błąd. Jeżeli linia nie jest odrzucana jest dopisywana do końca dowodu i zerowany jest licznik odrzucanych linii. Funkcja zwraca \texttt{prompt\_str} z dopisanymi liniami dowodu
+(linie te nie muszą tworzyć pełnego dowodu tezy, ale intuicyjnym celem tej funjkcji jest po prostu zrobienie pewnego postępu w dowodzie).
+
+Druga wersja systemu jest zaimplementowana w funkcji \texttt{find\_proof\_little\_smarter}. Idea tej funkcji sprowadza się do tego, że zamiast tworzyć jeden dowód, tworzymy listę potencjalnych prób dowodu 
+(na początku jest w niej jedynie prompt z zakodowanym problemem do udowodnienia) i w każdej iteracji pętli głównej programu losujemy któryś element tej listy (prawdopodobieństwa są tak ustawione, by 
+im wyższe jest średnie prawdopodobieństwo tokenów w danej próbie dowodu tym wyższe jest prawdopodobieństwo wylosowania danej próby) i przy pomocy funkcji \texttt{silliest\_generate\_proof} dopisujemy do tej próby
+kolejną linię dowodu i jeżeli próby dowodu po dopisaniu tej linii nie ma w liście prób dowodów dopisujemy ją do niej. Przejdźmy teraz do bardziej szczegółowego omówienia implementacji omawianej funjkcji.
+
+\texttt{find\_proof\_little\_smarter} jako argumenty przyjmuje obiekt texttt{bundle} typu \texttt{NanoGPTBundle}, który odpowiada za generowanie kolejnych tokenów, zmienną tekstową \texttt{prompt} która koduje sekwent do udowodnienia w 
+notacji takiej samej jak w \texttt{silliest\_generate\_proof}, zmienną \texttt{temperature} typu \texttt{float} która służy do regulacji poziomu determinizmu i losowości podczas generowania kolejnych tokenów, oraz
+zmienną \texttt{max\_iter} typu \texttt{int}, która określa ile maksymalnie iteracji głównej pętli dopuszczamy.
+
+Na początku funkcja parsuje \texttt{prompt} do obiektu \texttt{goal} klasy \texttt{LittleProblem}. Bazowy kontekst \texttt{goal} jest przechowywany w liście \texttt{base\_context} Następnie tworzymy listę \texttt{prompts} w którym umieszczamy oryginalny prompt oraz tabelę \texttt{probabilities\_wild}, 
+która tworzy listę liczb potrzebnych do obliczenia, prawdopodobieństwa losowania każdego elementu \texttt{prompts}, które trzymamy w tabeli \texttt{probabilities}. W pętli głównej losujemy element \texttt{prompts} i przy pomocy
+generujemy kolejną linię wylosowanej próby dowodu. Dopisujemy ją do wylosowanego prompta, a następnie przy pomocy funkcji \texttt{extract\_proof\_part} wyciągamy z tak powstałego prompta do zmiennej 
+\texttt{new\_proof} część kodującą dowód. Parsujemy dowód do 
+Parsujemy 
+
+
+\begin{tcolorbox}[
+    colback=gray!5,
+    colframe=black,
+    fonttitle=\bfseries,
+    title=Obserwacja 1
+]
+W logice klasycznej rachunku zdań:
+\[
+((\Gamma_1 \vdash \varphi_1 \quad \land \quad \Gamma_2 \vdash \varphi_2 \quad \land \quad \dots \quad \land  \quad\Gamma_n \vdash \varphi_n ) \rightarrow \Gamma \vdash \phi) 
+\]
+\[
+\leftrightarrow
+\]
+\[
+((\Gamma_1, \Gamma \vdash \varphi_1 \quad \land \quad \Gamma_2, \Gamma \vdash \varphi_2 \quad \land \quad \dots \quad \land  \quad\Gamma_n, \Gamma \vdash \varphi_n ) \rightarrow \Gamma \vdash \phi)
+\] 
+\subsection*{Dowód}
+\subsubsection*{$(\rightarrow)$}
+Jeżeli $\Gamma_i \vdash \varphi_i$, to $\Gamma_i , \Gamma \vdash \varphi_i$ ponieważ jesteśmy w stanie skonstruować dowód $\varphi_i$ w kontekście $\Gamma_i, \Gamma$ używając jedynie formuł z kontekstu
+$\Gamma_i$. Tak więc  
+\[
+(\Gamma_1, \Gamma \vdash \varphi_1 \quad \land \quad \Gamma_2, \Gamma \vdash \varphi_2 \quad \land \quad \dots \quad \land  \quad\Gamma_n, \Gamma \vdash \varphi_n ) 
+\] 
+\[
+\rightarrow
+\]
+\[
+(\Gamma_1 \vdash \varphi_1 \quad \land \quad \Gamma_2 \vdash \varphi_2 \quad \land \quad \dots \quad \land  \quad\Gamma_n \vdash \varphi_n )
+\]
+\[
+\rightarrow
+\]
+\[
+\Gamma \vdash \varphi
+\]
+
+
+\subsubsection*{$(\leftarrow)$}
+Załóżmy nie wprost, że teza nie zachodzi.
+Wtedy istnieją takie konteksty $\Gamma_1,\Gamma_2,\dots,\Gamma_n,\Gamma$ i formuły $\phi_1,\phi_2,\dots,\phi_n$, że $(\Gamma_1, \Gamma \vdash \varphi_1  \land  \Gamma_2, \Gamma \vdash \varphi_2  \land  \dots  \land  \Gamma_n, \Gamma \vdash \varphi_n ) \rightarrow \Gamma \vdash \phi$ jest prawdziwe oraz, że $(\Gamma_1 \vdash \varphi_1  \land  \Gamma_2 \vdash \varphi_2  \land  \dots  \land  \Gamma_n \vdash \varphi_n ) \rightarrow \Gamma \vdash \phi$ jest fałszywe. Niech $$F(\Gamma_i) := \text{koninkcja formuł w kontekście $\Gamma_i$}$$
+Z faktu, że w logice klasycznej dla rachunku zdań każde zdanie prawdziwe dla każdego wartościowania jest dowodliwe, to $\Gamma_i \vdash \phi_i$ jest równoważne, z $F({\Gamma_i}) \rightarrow \varphi_i$.
+
+Fałszywość $(\Gamma_1 \vdash \varphi_1 \land  \Gamma_2 \vdash \varphi_2  \land  \dots \land \Gamma_n \vdash \varphi_n ) \rightarrow \Gamma \vdash \phi$ oznacza, że istnieje wartościowanie takie, że dla każdego $i \in \{1,2,\dots,n\}$ zachodzi $F(\Gamma_i) \rightarrow \phi_i$, ale nie zachodzi $F(\Gamma) \rightarrow \phi$, ale to oznacza, że $F(\Gamma)$ dla tego wartościowania zachodzi, z kolei $\phi$ nie zachodzi. Ale ponieważ dla każdego $i \in \{1,2,\dots,n\}$ zachodzi $F(\Gamma_i) \rightarrow \phi_i$ i $F(\Gamma)$ zachodzi to znaczy, że $i \in \{1,2,\dots,n\}$ zachodzi $(F(\Gamma_i) \land F(\Gamma)) \rightarrow \phi_i$ i $F(\Gamma)$, czyli zachodzi 
+
+\[
+(\Gamma_1, \Gamma \vdash \varphi_1 \quad \land \quad \Gamma_2, \Gamma \vdash \varphi_2 \quad \land \quad \dots \quad \land  \quad\Gamma_n, \Gamma \vdash \varphi_n ) \land F(\Gamma)
+\]
+, czyli $\phi$ zachodzi dla tego wartościowania co daje sprzeczność.
+
+\end{tcolorbox}
+
+\bibliographystyle{plain}
+\bibliography{bibliography.bib}
+
+\end{document}

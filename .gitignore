@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# LaTeX build
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+*.nav
+*.snm
+
+# IDE / system
+.idea/
+.vscode/
+.DS_Store
+
+# Model / training artifacts
+out/
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.pkl
+
+# Big archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+
+# Optional generated data
+# data/
