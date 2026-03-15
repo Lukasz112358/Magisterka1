@@ -1,4 +1,5 @@
 \documentclass{article}
+\usepackage{forest}
 \usepackage{listings}
 \usepackage[T1]{fontenc}
 \usepackage[]{algorithm2e}
@@ -10,6 +11,7 @@
 \usepackage{bussproofs}
 \usepackage{longtable}
 \usepackage{caption}
+\usepackage{xcolor}
 % Language setting
 % Replace `English' with e.g. `spanish' to change the document language
 \usepackage[english, polish]{babel}
@@ -76,7 +78,8 @@ Regułą wnioskowania nazywamy schemat postaci
 \[
 \frac{S_1 \qquad S_2 \qquad \dots \qquad S_n}{S}(R)
 \]
-gdzie $S_1,\dots,S_n,S$ są sekwentami. Sekwenty $S_1,\dots,S_n$ nazywamy \emph{przesłankami reguły}, natomiast sekwent $S$ nazywamy \emph{konkluzją reguły}. $R$ to z kolei \emph{indeks reguły}, który służy do jej identyfikacji.
+gdzie $S_1,\dots,S_n,S$ są sekwentami. Sekwenty $S_1,\dots,S_n$ nazywamy \emph{przesłankami reguły}, natomiast sekwent $S$ nazywamy \emph{konkluzją reguły}. $R$ to z kolei \emph{indeks reguły}, który służy do jej identyfikacji. 
+Jeżeli przesłanki reguły są prawdziwe to z definicji jej konkluzja jest również prawdziwa.
 \end{tcolorbox}
 
 Dowody w dedukcji naturalnej można utożsamiać z drzewami, których węzłami są sekwenty,
@@ -91,7 +94,6 @@ Dowody w dedukcji naturalnej można utożsamiać z drzewami, których węzłami 
 W nieniejszej pracy skupimy się na dowodzeniu twierdzeń w logice klasycznej z następującymi spójnikiami logicznymi: koniunkcją ($\land$), alternatywą ($\lor$), negacją ($\neg$) oraz implikacją ($\to$).
 regułami wnioskowania:
 \begin{center}
-\label{tab:rules}
 \[
 \begin{array}{c c}
 \displaystyle
@@ -164,6 +166,7 @@ regułami wnioskowania:
 \end{array}
 \]
 \captionof{table}{Reguły wnioskowania rozważanego systemu}
+\label{tab:rules}
 \end{center}
 Oto przykładowy dowód w dedukcji naturalnej w notacji drzewiastej:
 
@@ -737,8 +740,13 @@ Kolejną klasą jest klasa \texttt{Rule}, która reprezentuje regułę wnioskowa
 
 
 \section{Parsowanie dowodów w notacji Ficha}
-W celu kontroli poprawności dowodu w notacji Fitcha, jest on w programie parsowany do reprezentującej go struktury logicznej. Dowody reprezentujemy jako słownik, którego kluczami są indeksy linii, a wartościami obiekty klasy \texttt{structure\_of\_line\_top\_down}. Klasa ta zawiera pola \texttt{Key}, które reprezentuje indeks linii, \texttt{args\_keys}, które reprezentują indeksy linii, które są używane jako przesłanki, \texttt{rule}, które reprezentuje regułę wnioskowania, której używamy oraz, \texttt{LP}, które reprezentuje sekwent który koduje dana linia. Wartość \texttt{LP} jest generowana przez regule \texttt{top\_down} zastosowaną dla przesłanek reprezentowanych przez \texttt{args\_keys} i pozostałych argumentów 
-Funkcja \texttt{\_\_init\_\_} tej klasy bierze za argument \texttt{Key}, \texttt{arg\_keys}, \texttt{rule}, a także \texttt{Proof\_so\_far}, które zawiera sparsowany do formy słownika dotychczasowy dowód, który jest konieczny gdy chcemy odwoływać się do przesłanek, oraz \texttt{formula\_text}, która jest wyciągniętą z linii formułą w notacji infiksowej, z której będzie niekiedy konieczne dedukować argumenty nie będące przesłankami w regule \texttt{top\_down}. Ostatnim argumentem dla funkcji \texttt{\_\_init\_\_} jest \texttt{BaseCntext}, który jest przyjmowanym w danym dowodzie kontekstem bazowym.
+W celu kontroli poprawności dowodu w notacji Fitcha, jest on w programie parsowany do reprezentującej go struktury logicznej. Dowody reprezentujemy jako słownik, którego kluczami są indeksy linii, a wartościami 
+obiekty klasy \texttt{structure\_of\_line\_top\_down}. Klasa ta zawiera pola \texttt{Key}, które reprezentuje indeks linii, \texttt{args\_keys}, które reprezentują indeksy linii, które są używane jako przesłanki, 
+\texttt{rule}, które reprezentuje regułę wnioskowania, której używamy oraz, \texttt{LP}, które reprezentuje sekwent który koduje dana linia. Wartość \texttt{LP} jest generowana przez regule \texttt{top\_down} 
+zastosowaną dla przesłanek reprezentowanych przez \texttt{args\_keys} i pozostałych argumentów 
+Funkcja \texttt{\_\_init\_\_} tej klasy bierze za argument \texttt{Key}, \texttt{arg\_keys}, \texttt{rule}, a także \texttt{Proof\_so\_far}, które zawiera sparsowany do formy słownika dotychczasowy dowód, który 
+jest konieczny gdy chcemy odwoływać się do przesłanek, oraz \texttt{formula\_text}, która jest wyciągniętą z linii formułą w notacji infiksowej, z której będzie niekiedy konieczne dedukować argumenty nie będące 
+przesłankami w regule \texttt{top\_down}. Ostatnim argumentem dla funkcji \texttt{\_\_init\_\_} jest \texttt{BaseCntext}, który jest przyjmowanym w danym dowodzie kontekstem bazowym.
 
 Funkcja \texttt{parseProof} tworzy słownik, w którym każdemu indeksowii linii jest przypisany odpowiedni obiekt typu \texttt{structure\_of\_line\_top\_down}. Funkcja ta jako argumenty przyjmuje dowód w notacji Fitcha w formie tekstowej, oraz używany w dowodzie kontekst bazowy. Funkcja ta wczytuje dowód linia po linii i aktualizuje słownik. Sprawdza również, czy formuła będąca konkluzją pola \texttt{LP}
 obiektu klasy \texttt{structure\_of\_line\_top\_down} odpowiadająca danej linii jest taka sama jak formuła zapisana w zapisie tekstowej tej linii. Jeżeli tak nie jest oznacza to, że dowód jest niepoprawny
@@ -778,6 +786,7 @@ przeszukiwania metodą prób i błędów. Ostateczna wersja rozszerza ten schema
 dekompozycję celu na podproblemy. Każda kolejna wersja wykorzystuje poprzednią jako
 komponent składowy. W dalszej części rozdziału omawiam kolejno wszystkie trzy strategie.
 
+
 Pierwsza wersja systemu zawiera się w funkcji \texttt{silliest\_generate\_proof}. Jej argumenty to \texttt{bundle} będący obiektem klasy \texttt{NanoGPTBundle} 
 którym będziemy generować tekst dowodu, \texttt{prompt} który jest zmienną tekstową, która koduje twierdzenie, które mamy udowodnić, i ewentualnie początek dowodu, 
 zmienna \texttt{temperature} typu \texttt{float}, która pozwala kontrolować poziom determinizmu generacji oraz zmienna \texttt{max\_new\_lines} typu \texttt{int}, która określa ile linii 
@@ -803,12 +812,35 @@ notacji takiej samej jak w \texttt{silliest\_generate\_proof}, zmienną \texttt{
 zmienną \texttt{max\_iter} typu \texttt{int}, która określa ile maksymalnie iteracji głównej pętli dopuszczamy.
 
 Na początku funkcja parsuje \texttt{prompt} do obiektu \texttt{goal} klasy \texttt{LittleProblem}. Bazowy kontekst \texttt{goal} jest przechowywany w liście \texttt{base\_context} Następnie tworzymy listę \texttt{prompts} w którym umieszczamy oryginalny prompt oraz tabelę \texttt{probabilities\_wild}, 
-która tworzy listę liczb potrzebnych do obliczenia, prawdopodobieństwa losowania każdego elementu \texttt{prompts}, które trzymamy w tabeli \texttt{probabilities}. W pętli głównej losujemy element \texttt{prompts} i przy pomocy
-generujemy kolejną linię wylosowanej próby dowodu. Dopisujemy ją do wylosowanego prompta, a następnie przy pomocy funkcji \texttt{extract\_proof\_part} wyciągamy z tak powstałego prompta do zmiennej 
-\texttt{new\_proof} część kodującą dowód. Parsujemy dowód do 
-Parsujemy 
+która tworzy listę liczb potrzebnych do obliczenia, prawdopodobieństwa losowania każdego elementu \texttt{prompts}, które trzymamy w tabeli \texttt{probabilities}. 
+W pętli głównej losujemy element \texttt{prompts} i przy pomocy \texttt{silliest\_generate\_proof} 
+generujemy kolejną linię wylosowanej próby dowodu. Tak zaktualizowany prompt zapisujemy  w zmiennej \texttt{new\_prompt\_str}. Dopisujemy ją do wylosowanego prompta, a następnie przy pomocy funkcji \texttt{extract\_proof\_part} wyciągamy z tak powstałego prompta do zmiennej 
+\texttt{new\_proof} część kodującą dowód. Sprawdzamy czy numeracja wierszy w \texttt{new\_proof} jest poprawna (jeżeli nie jest wyłapujemy wyjątek i przechodzimy do kolejnej iteracji), a następnie parsujemy dowód do zmiennej \texttt{parsedProof} przy pomocy funkcji \texttt{parseProof} i używając kontekstu \texttt{base\_context} jako kontekstu bazowego. 
+Jeżeli podczas parsowania otrzymamy błąd wyłapujemy wyjątek i przechodzimy do następnej iteracji pętli. W przeciwnym przypadku jeżeli ostatnia sparsowana linia \texttt{parsedProof} jest taka sama jak sekwent docelowy to zwracamy 
+\texttt{new\_prompt\_str}. Jeśli to jeżeli \texttt{new\_prompt\_str} nie ma w tabeli \texttt{prompts} to dopisujemy ją do niej, a następnie aktualizujemy prawdopodobieństwa w sposób opisany poniżej.
+
+Do aktualizacji prawdopodobieństw używamy funkcji \texttt{prompt\_probability\_nomalised}. Jako argumenty przyjmuje \texttt{bundle} które odpowiada za liczenie prawdopodobieństw kolejnych tokenów, \texttt{prompt} którego prawdopodobieństwo
+analizujemy. Funkcja ta z założenia służy do badania prawdopodobieństwa promptów, które składają się z zakodowania sekwentu, który mamy udowodnić, 
+a także niepustej próby dowodu. Najpierw dzieli \texttt{prompt} na część kodującą sekwent oraz część próby dowodu, którą zapisujemy do zmiennej \texttt{proof}. Następnie iterując się po kolejnych znakach w 
+\texttt{proof} sumujemy do zmiennej \texttt{ans\_unnormalised} logarytmy prawdopodobieństwo warunkowe jego wystąpienia o ile znaki poprzedzające go w prompcie pozostają bez zmian. Prawdopodobieństwo to obliczamy przy pomocy funkcji 
+\texttt{last\_token\_probability\_from\_bundle}. Następnie zwracamy \texttt{ans\_unnormalised} podzielone przez długość części \texttt{proof}.
+
+Sama aktualizacja prawdopodobieństw zaczyna się od aktualizacji tabeli \texttt{probabilities\_wild}, poperzez dopisanie na jej końcu wartości \texttt{prompt\_probability\_normalised} dla używanego \texttt{bundle}
+oraz \texttt{new\_prompt\_str}. (Pole \texttt{probabilities\_wild[i]} odpowiada polu \texttt{prompts[i]}). Dla promptów, które nie posiadają części odpowiadającej za próbę dowodu funkcja \texttt{prompt\_probability\_normalised} 
+nie działa poprawnie toteż nie może zostać użyta do obliczenia wartości 
+\texttt{probabilities\_wild[0]} odpowiadającego prawdopodobieństwu promptu zawierającego sam problem bez żadnej linii dowodu toteż na wartość tego pola jest ustawiana średnia wartości pozostałych pól tablicy
+\texttt{probabilities\_wild}. Ponieważ wartości \texttt{probabilities\_wild} nie sumują się do $1$ i nie są dodatnie do tabeli \texttt{probabilities} zapisujemy wartość funkcji \texttt{soft\_max} obliczonej dla 
+tabeli \texttt{probabilities\_wild} traktowanej jako matematyczny wektor. Tak zaktualizowanej tabeli \texttt{probabilities} używamy do losowania prompta do rozwinięcia w następnej iteracji pętli. 
+Jeżeli po całym wykonaniu pętli wciąż nie znaleźliśmy dowodu funkcja \texttt{find\_proof\_little\_smarter} zwraca parę list \texttt{prompts} i \texttt{probabilities}.
+
+Ostatnia strategia, w której rozbijamy problem na podproblemy zostanie omówiona w następnych rozdziałach.
 
 
+
+
+\section{Rozbijanie problemów na podproblemy}
+
+\begin{center}
 \begin{tcolorbox}[
     colback=gray!5,
     colframe=black,
@@ -817,13 +849,13 @@ Parsujemy
 ]
 W logice klasycznej rachunku zdań:
 \[
-((\Gamma_1 \vdash \varphi_1 \quad \land \quad \Gamma_2 \vdash \varphi_2 \quad \land \quad \dots \quad \land  \quad\Gamma_n \vdash \varphi_n ) \rightarrow \Gamma \vdash \phi) 
+((\Gamma_1 \vdash \varphi_1 \quad \land \quad \Gamma_2 \vdash \varphi_2 \quad \land \quad \dots \quad \land  \quad\Gamma_n \vdash \varphi_n ) \rightarrow \Gamma \vdash \varphi) 
 \]
 \[
 \leftrightarrow
 \]
 \[
-((\Gamma_1, \Gamma \vdash \varphi_1 \quad \land \quad \Gamma_2, \Gamma \vdash \varphi_2 \quad \land \quad \dots \quad \land  \quad\Gamma_n, \Gamma \vdash \varphi_n ) \rightarrow \Gamma \vdash \phi)
+((\Gamma_1, \Gamma \vdash \varphi_1 \quad \land \quad \Gamma_2, \Gamma \vdash \varphi_2 \quad \land \quad \dots \quad \land  \quad\Gamma_n, \Gamma \vdash \varphi_n ) \rightarrow \Gamma \vdash \varphi)
 \] 
 \subsection*{Dowód}
 \subsubsection*{$(\rightarrow)$}
@@ -849,7 +881,7 @@ $\Gamma_i$. Tak więc
 \subsubsection*{$(\leftarrow)$}
 Załóżmy nie wprost, że teza nie zachodzi.
 Wtedy istnieją takie konteksty $\Gamma_1,\Gamma_2,\dots,\Gamma_n,\Gamma$ i formuły $\phi_1,\phi_2,\dots,\phi_n$, że $(\Gamma_1, \Gamma \vdash \varphi_1  \land  \Gamma_2, \Gamma \vdash \varphi_2  \land  \dots  \land  \Gamma_n, \Gamma \vdash \varphi_n ) \rightarrow \Gamma \vdash \phi$ jest prawdziwe oraz, że $(\Gamma_1 \vdash \varphi_1  \land  \Gamma_2 \vdash \varphi_2  \land  \dots  \land  \Gamma_n \vdash \varphi_n ) \rightarrow \Gamma \vdash \phi$ jest fałszywe. Niech $$F(\Gamma_i) := \text{koninkcja formuł w kontekście $\Gamma_i$}$$
-Z faktu, że w logice klasycznej dla rachunku zdań każde zdanie prawdziwe dla każdego wartościowania jest dowodliwe, to $\Gamma_i \vdash \phi_i$ jest równoważne, z $F({\Gamma_i}) \rightarrow \varphi_i$.
+Z faktu, że w logice klasycznej dla rachunku zdań każde zdanie prawdziwe dla każdego wartościowania jest dowodliwe, to $\Gamma_i \vdash \phi_i$ jest równoważne, z tautologicznością $F({\Gamma_i}) \rightarrow \varphi_i$.
 
 Fałszywość $(\Gamma_1 \vdash \varphi_1 \land  \Gamma_2 \vdash \varphi_2  \land  \dots \land \Gamma_n \vdash \varphi_n ) \rightarrow \Gamma \vdash \phi$ oznacza, że istnieje wartościowanie takie, że dla każdego $i \in \{1,2,\dots,n\}$ zachodzi $F(\Gamma_i) \rightarrow \phi_i$, ale nie zachodzi $F(\Gamma) \rightarrow \phi$, ale to oznacza, że $F(\Gamma)$ dla tego wartościowania zachodzi, z kolei $\phi$ nie zachodzi. Ale ponieważ dla każdego $i \in \{1,2,\dots,n\}$ zachodzi $F(\Gamma_i) \rightarrow \phi_i$ i $F(\Gamma)$ zachodzi to znaczy, że $i \in \{1,2,\dots,n\}$ zachodzi $(F(\Gamma_i) \land F(\Gamma)) \rightarrow \phi_i$ i $F(\Gamma)$, czyli zachodzi 
 
@@ -859,7 +891,74 @@ Fałszywość $(\Gamma_1 \vdash \varphi_1 \land  \Gamma_2 \vdash \varphi_2  \lan
 , czyli $\phi$ zachodzi dla tego wartościowania co daje sprzeczność.
 
 \end{tcolorbox}
+\end{center}
 
+Mimo, że dowody w dedukcji naturalnej w notacji Fitcha piszemy zaczynając od przesłanek, a następnie łączymy je odpowiednimi regułami tak by otrzymać jako konkluzję rządaną tezę, to dowody w notacji drzewiastej 
+zwykle generuje się w przeciwnym kierunku. Najpierw w korzeniu drzewa dowodu zapisujemy tezę, którą chcemy udowodnić, a następnie wybieramy regułę i przesłanki do których jeśli zastosujemy wybraną regułę możemy
+otrzymać szukaną tezę. Następnie próbujemy rekurencyjnie udowodnić owe przesłanki używając ich jako korzenie nowych poddrzew drzewa dowodu. Taka metoda jest szczególnie kożystna gdy formuła jest skomplikowana, i trudno
+przewidzieć jak zacząć dowód w notacji Fitcha tak by dało się go doprowadzić do końca. 
+
+Podobnie jak dla dowodów w notacji Fitcha rozbicia problemów będziemy kodować na dwa sposoby. Z jednej strony ich logiczną strukturę będziemy przechowywać w odpowiedniej klasie, przy pomocy której będziemy 
+kontrolować poprawność rozbić z drugiej będziemy kodować je w odpowiedniej formie tekstowej, tak by do dokonywania rozbić można było wytrenować model językowy typu \texttt{nanoGPT}
+notacji
+
+Klasą która będzie przechowywać logiczną strukturę takiego rozbicia będzie klasa \texttt{smashed\_problem}, której pola to \texttt{problem}, które zawiera obiekt klasy \texttt{LittleProblem}, który jest problemem, który 
+rozbijamy, zmienną \texttt{subproblems}, która jest listą przesłanek klasy \texttt{LittleProblem}, które otrzymujemy po rozbiciu oraz zmienną klasy \texttt{Rule}, która jest regułą, przy pomocy której dokonujemy 
+rozbicia.
+
+Gdy mamy obiekt typu \texttt{smashed\_problem} ważne jest sprawdzić, czy zakodowane w nim rozbicie jest poprawne. To znaczy, czy faktycznie stosując zakodowaną w \texttt{Rule} regułę dowodzenia do listy przesłanek w 
+\texttt{subproblems} faktycznie możemy otrzymać \texttt{Problem} oraz czy owe przesłanki faktycznie są sekwentami tautologicznymi. W tym celu używamy funkcji \texttt{is\_smashed\_correctly}. Funkcja ta jako argument 
+przyjmuje zmienną \texttt{SP} typu \texttt{smashed\_problem}. Na początku funkcja sprawdza czy wszystkie pola w \texttt{SP} mają odpowiednie typy i jeżeli tak nie jest wyrzuca ona błąd \texttt{ValueError("Bad arguments")}.  
+Następnie dla każdego elementu \texttt{SP.subproblems} sprawdza, czy koduje on sekwent tautologiczny poprzez podstawienie każdego możliwego wartościowania zmiennych. Oczywistą wadą tego podejścia jest to, że złożoność 
+tej operacji jest wykładnicza względem liczby różnych zmiennych występujących w danym sekwencie. Należy jednak zaznaczyć, że ze względu na ograniczoność zasobów obliczeniowych dostępnych na potrzeby pracy tworzony model
+i tak generuje dowody jedynie stosunkowo krótkich formuł. Dla bardziej złożonych formuł możnaby sprawdzenie wszystkich możliwości zastąpić pewnymi heurystykami np sprawdzeniu odpowiednio dużo losowych wartościowań.
+Jednocześnie samo rozbicie na nietautologiczne sekwenty nie jest bardzo problematyczne, w tym sensie, że zwykle wykonujemy równolegle kilka rozbić i wystarczy, że przynajmniej jedno rozbija problem na sekwenty tautologiczne.
+Z kolei rozbicia na sekwenty nietautologiczne nie prowadzą w dalszej części do generacji błędnych dowodów, a jedynie sprowadzają niektóre gałęzie generacji dowodu w ślepe uliczki, co spowalnia program, ale nie wpływa
+na jego poprawność. 
+
+Kolejnym krokiem jest sprawdzanie czy reguła \texttt{SP.Rule} może faktycznie rozbić \texttt{SP.problem} na \texttt{SP.subproblems}. Ponieważ nie wszystkie elementy \texttt{SP.subproblems} mają ten sam \texttt{base\_context} 
+co \texttt{SP.problem}, uniemożliwia bezpośrednie zastosowanie do nich \texttt{SP.Rule.top\_down} najpierw tworzymy tabelę \texttt{unnormalised\_subproblems} której \texttt{i}-ty element jest obiektem klasy \texttt{LittleProblem}, którego kontekst bazowy to \texttt{SP.problem.assumptions.base\_context},
+z kolei kontekst dodatkowy to wszystkie formuły zawierające się w kontekście bazowym i dodatkowym obiektu \texttt{SP.subproblems[i]}, które nie znajdują się w \texttt{SP.problem.assumptions.base\_context}. Konkluzja 
+\texttt{unnormalised\_subproblems[i]} jest taka sama jak w \texttt{SP.subproblems[i]}. Następnie stosujemy \texttt{SP.Rule.top\_down} której argumentami są lista obiektów klasy \texttt{LittleProblem} o tych samych
+kontekstach bazowych: \texttt{unnormalised\_subproblems} i odpowiednio wydedukowane z 
+\texttt{SP.problem} pozostałe argumenty. Jeśli wynik tej funkcji jest taki sam jak \texttt{SP.problem} to funkcja \texttt{is\_smashed\_correctly} zwraca \texttt{True}, zaś w przeciwnym razie \texttt{False}.
+
+Format tekstowy zapisu rozbicia formuły jest następujący: w pierwszej lini mamy tekst \texttt{Smash: }, po którym zostaje zapisany sekwent który chcemy rozbić. Druga linia zaczyna się od napisu \texttt{With: }
+po którym następuje nazwa reguły której używamy do rozbicia. Trzecia linia zaczyna się od tekstu \texttt{To: } po którym w następuje pierwsza przesłanka na którą zostaje rozbity rozbijany sekwent. Kolejne sekwenty 
+rozbicia są zapisywane w kolejnych liniach po przecinku. Jeżeli Lista przesłanek jest pusta prompt kodujący rozbicie kończy się po prostu na \texttt{To: }.  Do sprawdzania czy dany tekst w tym formacie koduje 
+poprawne rozbicie używamy funkcji \texttt{check\_smash\_from\_text}, która najpierw parsuje tekst kodujący rozbicie do obiektu typu \texttt{smashed\_problem}, a następnie sprawdza jego poprawność przy pomocy funjkcji \texttt{is\_smashed\_correctly}.  Jeżeli rozbicie jest niepoprawne, lub podany w argumencie prompt nie jest w odpowiednim formacie \texttt{check\_smash\_from\_text} wyrzuca błąd \texttt{TypeError} z odpowiednią wiadomością. Jeźeli zaś prompt koduje poprawne rozbicie 
+funkcja zwraca zakodowane rozbicie w formie sparsowanej.
+
+Do generowania poprawnych napisów kodujących rozbicie służy funkcja \texttt{silliest\_generate\_smash}. Przyjmuje ona za argumenty zmienną \texttt{bundle} typu \texttt{NanoGPTBundle} odpoowiadający za generację kolejnych tokenów oraz zmienną tekstową \texttt{prompt} kodującą sekwent który chcemy rozbić w omawianym formacie tekstowym. W bloku \texttt{try \dots exept} funkcja ta generuje kolejne linie rozbicia przy pomocy funkcji \texttt{next\_line}, które dopisujemy do zmiennej \texttt{prompt}. Robimy to aż do momentu gdy tak zaktualizowany \texttt{prompt} nie będzie spełniać predykatu \texttt{is\_ready\_to\_check\_smash}, który zwraca prawdę wtedy i tylko wtedy gdy podana jako argument zmienna tekstowa \texttt{prompt}, po uprzednim usunięciu znaków nowej linii z jej końca ma nie mniej niż 3 linie i jej ostatnim znakiem nie jest \texttt{,}. Kiedy ten predykat będzie spełniony sprawdzamy najpierw przy pomocy poprawność rozbicia zakodowanego w \texttt{prompt} przy pomocy \texttt{check\_smash\_from\_text} i jeśli nie jest poprawne wyrzucamy odpowiedni błąd, z kolei jeśli jest poprawne sprawdzamy czy w przesłankach na które rozbiliśmy rozbijany sekwent nie pojawiają się zmienne inne niż w rozbijanym sekwencie. Jeżeli tak się dzieje zwracamy wyrzucamy błęd. Jeśli podczas rozbijania zostanie wyłapany błąd zostawiamy w prompcie tylko pierwszą linię i znak nowej linii, a następnie powtarzamy całą procedurę, aż do momentu kiedy nie wygenerujemy poprawnego rozbicia.
+
+W prototypowych wersjach programu rozważane były wyłącznie dowody formuł tautologicznych, a więc sekwentów o pustym kontekście. Ograniczenie to okazało się jednak niewystarczające, ponieważ podczas rozbijania celu na prostsze podproblemy pojawiają się sekwenty o niepustych kontekstach. Aby system mógł poprawnie obsługiwać takie przypadki, konieczne było rozszerzenie go o możliwość dowodzenia sekwentów z założeniami.
+
+Z Obserwacji~1 wynika przez prostą indukcję po drzewie dowodu, że dowód
+$\Gamma \vdash \varphi$ w którym kontekst każdego wierzchołka zawiera~$\Gamma$, istnieje wtedy i tylko wtedy gdy istnieje równinież dowód sekwentu zawierający w liściach sekwenty o pustym kontekście. Toteż bez straty ogólności w całym dowodzie $\Gamma \vdash \varphi$ możemy przyjąć za prawdziwe założenia z kontekstu \texttt{Gamma}. Jest to użyteczne  ponieważ w procesie generowania dowodu mamy gwarancję, że nie trafimy w ślepą uliczkę w postaci odrzuceniu niektórych 
+założeń z dowodzonego sekwentu, do których nasz model będzie miał trudność wrócić. Jest to motywacja dlaczego \texttt{Context} jest podzielony na dwie tabele \texttt{base\_context} i \texttt{additional\_context}.
+
+
+\section{Klasa \texttt{node}}
+
+Aby połączyć zarówno rozbijanie problemów na podproblemy oraz generowanie dowodów w notacji Fitcha w jeden kompleksowy system będę używał klasy \texttt{node}. 
+ 
+\texttt{node} koduje drzewo przeszukiwań dowodu. Drzewo to ma wierzchołki dwóch rodzajów. Pierwszy z nich w polu \texttt{Interior} zawiera obiekt klasy \texttt{LittleProblem} z kolei drugi zawiera obiekt klasy \texttt{smashed\_problem}.
+Dla uproszczenia będę wierzchołki pierwszego rodzaju nazywać \texttt{LPNode}, z kolei wierzchołki drugiego rodzaju będę nazywać \texttt{SPNode} mimo, że takie nazewnictwo nie występuje w samym kodzie programu. Dzieci rodzaju \texttt{LPNode} są rodzaju \texttt{SPNode}, z kolei dzieci rodzaju \texttt{SPNode} są rodzaju \texttt{LPNode}. Precyzyjniej dziećmi wierzchołków zawierających w polu \texttt{Interior} obiekt klasy \texttt{LittleProblem} kodujący pewien sekwent, w polu \texttt{Interior} mają obiekty klasy \texttt{smashed\_problem} kodujące poprawne rozbicia tego obiektu. Z kolei dzieci wierzchołków zawierających w polu \texttt{Interior} obiekt klasy \texttt{smashed\_problem} mają w polu \texttt{Interior} obiekty klasy \texttt{LittleProblem} zawierające przesłanki tego rozbicia. 
+
+Poza zmienną \texttt{Interior} klasa \texttt{node} zawiera też pole \texttt{Parent} które wskazuje na rodzica wierzchołka, pole \texttt{Children} listę dzieci, pole \texttt{Text}, które dla \texttt{LPNode} zawiera prompta z zapytaniem o dowód
+sekwentu w polu \texttt{Interior} lub zapytanie wraz z pełnym dowodem oraz pole \texttt{Probability}, które dla \texttt{SPNode} określa prawdopodobieństwo, że wybierzemy do analizy ten wierzchołek schodząc w dół od jego rodzica. Ostatnim polem jest zmienna boolowska \texttt{Value}. Dla liści typu \texttt{LittleProblem} ma wartość \texttt{False} jeśli w polu \texttt{Text} zawiera ona prompta jedynie z zapytaniem o dowód sekwentu i \texttt{True} jeśli w tym polu
+prompt składa się z zarówno zapytania jak i dowodu. Dla wierzchołków wewnętrznych rodzaju \texttt{LPNode} wartość \texttt{Value} to alternatywa wartości \texttt{Value} dzieci tego wierzchołka. Wierzchołek rodzaju \texttt{SPNode} może być liściem tylko wtedy, gdy lista przesłanek obiektu klasy \texttt{smashed\_problem} w zakodowanym w jego polu \texttt{Interior} jest pusta. Wtedy też wartość pola \texttt{Value} dla tego wierzchołka jest równa \texttt{True}. Dla wierzchołków wewnętrznych rodzaju \texttt{SPNode} pole \texttt{Value} jest równe koniunkcji wartości pól \texttt{Value} jego dzieci. 
+
+Metoda \texttt{Smash\_Leaf} klasy \texttt{node} odpowiada za doczepianie do dzieci rodzaju \texttt{SPNode} które zawierają zakodowane rozbicia pola \texttt{Interior} swojego rodzica, a następnie doczepienia do tych dzieci ich dzieci
+rodzaju \texttt{LPNode} z przesłankami rozbicia kodowanego w ich rodzicach. Funkcja ta przyjmuje jako argumenty obiekt \texttt{bundle\_smashing} typu \texttt{NanoGPTBundle} odpowiadający za generowanie rozbić, oraz zmienna całkowitoliczbowa \texttt{deg} oznaczająca ile rozbić (nie koniecznie różnych) które będziemy wykonywać. Na początku tworzymy prompta zaczynającego się od \texttt{Smash: }, po którym następuje zapis sekwentu, który chcemy rozbijać i znak nowej lini. Następnie \texttt{deg} rzay przy pomocy metody \texttt{silliest\_generate\_smash} dopisujemy do tego prompta tekstową reprezentację rozbicia. Ponieważ częso model umie dość dobrze znajdować najkożystniejsze rozbicie, często one się powtażają. Dlatego tekstowe reprezentacje wygenerowanych rozbić przechowujemy jako klucze słwonika \texttt{weights}, w którym \texttt{weights[i]} jest równa liczbie ile razy uruchomiona funkcja \texttt{Smash\_Leaf} 
+wygenerowała \texttt{i}. Następnie do tabeli \texttt{Children} rozbijanego wierzchołka dodajemy obiekty klasy \texttt{node}, które w polu \texttt{Interior} mają zparsowaną przy pomocy \texttt{check\_smash\_from\_text} do obiektu klasy  \texttt{smashed\_problem} wygenerowaną wcześniej tekstową reprezentację rozbicia, z kolei w polu \texttt{Probability} ma iloraz liczby ile razy dana reprezentacja tekstowa została wygenerowana i liczby \texttt{deg}. Kolejnym krokiem jest dla każdego z tych dopisanych dzieci dopisanie do tabeli \texttt{Children} ich dzieci obiekty klasy \texttt{node}, które w polu \texttt{Interior} mają obiekty typu \texttt{LittleProblem} reprezentujące przesłanki rozbić zakodowanych w ich rodzicach. Załóżmy, że któreś z dzieci wierzchołka podanego jako argument dla funkcji \texttt{Smash\_Leaf} po wykonaniu wcześniej omawianych kroków nie ma dzieci. Oznacza to, że sekwent którego rozbicie jest zakodowane w tym dziecku nie potrzebuje dodatkowych kroków dowodu by go udowodnić. Ustawiamy wtedy pole \texttt{Value} tego dziecka na \texttt{True} i aktualizujemy wartości pola \texttt{Value} dla wszystkich jego przodków.
+
+Kolejną metodą klasy \texttt{node} jest funkcja \texttt{RunLeaf}. Próbuje najpierw znaleźć dowód sekwentu, który w polu \texttt{Interior} przechowuje obiekt, który ją wywołuje, a jeśli nie jest w stanie tego zrobić dokonuje jego rozbicia przy pomocy metody \texttt{Smash\_Leaf}. Funkcja ta przyjmuje dwa obiekty klasy \texttt{NanoGPTBoundle}. Pierwszym z nich jest obiekt \texttt{bundle\_proving} generujący dowody sekwentów, drugim zaś z kolei jest
+ \texttt{bundle\_smashing}
+odpowiadający za generowanie rozbić. Kolejnym argumentem jest zmienna zmiennoprzecinkowa \texttt{temperature} regulująca poziom determinizmu przy generowaniu dowodów, zmienna całkowitoliczbowa \texttt{max\_iter}, która określa maksymalną liczbę iteracji prób dopisania kolejnej linii przy próbie generowania dowodu, a także \texttt{deg}, która reguluje ile rozbić (niekoniecznie różnych) mamy wykonać, jeżeli sekwentu nie uda się udowodnić. Na początku funkcja sprawdza czy wywołujący ją obiekt jest liściem i czy jest \texttt{LPNode}. Jeżeli tak nie jest funkcja zwraca wyjątek z odpowiednim komentarzem.  Następnie  tworzymy prompta z zapytaniem o dowód sekwentu, kóry znajduje się w polu \texttt{Interior} wierzchołka w którym się znajdujemy. Zapytanie to podajemy do funkcji \texttt{find\_proof\_little\_smarter} która przy pomocy \texttt{bundle\_proving} próbuje udowodnić zadany w prompcie sekwent. Jeżeli to się uda funkcja ta zwraca obiekt klasy \texttt{str} z dowodem, jeżeli zaś nie zwraca ona tabelę prób i pomocniczych prawdopodobieństw. Sprawdzamy więc czy \texttt{find\_proof\_little\_smarter} zwróci zmienną typu \texttt{str} a jeśli tak to w polu \texttt{Text} wierzchołka w którym się znajdujemy zapisujemy ten dowód, a następnie ustawiamy wartość jego pola \texttt{Value} na \texttt{True} i aktualizujemy wartości pola \texttt{Value} dla jego przodków. W przeciwnym razie rozbijamy obiekt którym wywołaliśmy metodę \texttt{RunLeaf} metodą \texttt{Smash\_Leaf} używając \texttt{bundle\_smashing} i podaną w argumencie do \texttt{RunLeaf} zmienną \texttt{deg}. Jeżeli \texttt{RunLeaf} uda się znaleźć dowód zwracamy \texttt{True}. W przeciwnym wypadku zwracamy \texttt{False}.
+
+
+Kolejną metodą klasy \texttt{node} jest funkcja \texttt{TryNode}. Funkcja ta próbuje przeprowadzić cały dowód zadanego sekwentu a także jeśli to się nie uda zaktualizować drzewo tak by było bliższe znalezienia owego dowodu. Argumenty tej funkcji mają takie same nazwy, typy oraz zastosowania jak argumenty funkcji \texttt{RunLeaf}. Jeżeli znalezienie dowodu się powiedzie funkcja zwraca \texttt{True}, a w przeciwnym wypadku zwraca \texttt{False}. Działanie tej funkcji dzielimy na trzy nietrywialne przypadki przy czym przez znalezienie dowodu dla każdego z nich rozumiemy następująco. Dla przypadku liścia rodzaju \texttt{LPNode} jest to udowodnienie sekwentu zakodowanego w polu \texttt{Interior}, dla wierzchołków wewnętrznych rodzaju \texttt{LPNode} przez znalezienie dowodu rozumiemy znalezienie dowodu dla któregoś z jego dzieci, z kolei dla wierzchołków wewnętrznych rodzaju \texttt{SPNode} przez znalezienie dowodów dla wszystkich jego dzieci. Ostatnim trywialnym przypadkiem jest gdy wierzchołek wywołujący funkcję ma w polu \texttt{Value} wartość \texttt{True}, co oznacza, że dowód dla tego wierzchołka już został znaleziony i wtedy funkcja \texttt{TryNode} zwraca \texttt{True}.
 \bibliographystyle{plain}
 \bibliography{bibliography.bib}
 

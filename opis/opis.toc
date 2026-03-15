@@ -2,9 +2,11 @@
 \babel@toc {english}{}\relax 
 \babel@toc {polish}{}\relax 
 \contentsline {section}{\numberline {1}Wstęp}{3}{section.1}%
-\contentsline {section}{\numberline {2}Notacja Ficha i jej interpretacja}{4}{section.2}%
+\contentsline {section}{\numberline {2}Notacja Ficha i jej interpretacja}{5}{section.2}%
 \contentsline {section}{\numberline {3}Ustawienie modelu}{7}{section.3}%
 \contentsline {section}{\numberline {4}Parsowanie dowodów w notacji Ficha}{8}{section.4}%
-\contentsline {section}{\numberline {5}Generowanie korpusu}{8}{section.5}%
-\contentsline {section}{\numberline {6}Trenowanie i kożystanie z modelu (NanoGPTBundle i te wszystkie funkcje z nim związane !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!, podkreślam WSZYSTKIE(liczenie prawdopodobieństwa, dodawanie tokenu, linii, trenowanie, dotrenowanie, ładowanie)!!!!)}{8}{section.6}%
-\contentsline {section}{\numberline {7}3 strategie}{8}{section.7}%
+\contentsline {section}{\numberline {5}Generowanie korpusu}{9}{section.5}%
+\contentsline {section}{\numberline {6}Trenowanie i kożystanie z modelu (NanoGPTBundle i te wszystkie funkcje z nim związane !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!, podkreślam WSZYSTKIE(liczenie prawdopodobieństwa, dodawanie tokenu, linii, trenowanie, dotrenowanie, ładowanie)!!!!)}{9}{section.6}%
+\contentsline {section}{\numberline {7}3 strategie}{9}{section.7}%
+\contentsline {section}{\numberline {8}Rozbijanie problemów na podproblemy}{11}{section.8}%
+\contentsline {section}{\numberline {9}Klasa \texttt {node}}{13}{section.9}%
