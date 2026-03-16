@@ -1,5 +1,5 @@
 # Fdb version 4
-["bibtex opis"] 0 "opis.aux" "opis.bbl" "opis" 1773616222.10922 0
+["bibtex opis"] 0 "opis.aux" "opis.bbl" "opis" 1773681015.37721 0
   "/usr/share/texlive/texmf-dist/bibtex/bst/base/plain.bst" 1292289607 20613 bd3fbfa9f64872b81ac57a0dd2ed855f ""
   "bibliography.bib" 0 -1 0 ""
   "opis.aux" 0 -1 0 "pdflatex"
@@ -7,9 +7,9 @@
   "opis.bbl"
   "opis.blg"
   (rewritten before read)
-["pdflatex"] 1773616221.41194 "/home/lukasz/PycharmProjects/Magisterka/opis/opis.tex" "opis.pdf" "opis" 1773616222.10932 0
+["pdflatex"] 1773681014.69229 "/home/lukasz/PycharmProjects/Magisterka/opis/opis.tex" "opis.pdf" "opis" 1773681015.3774 0
   "/etc/texmf/web2c/texmf.cnf" 1767383842.90482 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/lukasz/PycharmProjects/Magisterka/opis/opis.tex" 1773616221.31905 52973 65d4ea7dac075c06866cd666df3a5da3 ""
+  "/home/lukasz/PycharmProjects/Magisterka/opis/opis.tex" 1773681014.58804 54004 891d43b3b433e3674346ec90318b5535 ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/inconsolata/i4-t1-0.enc" 1558214095 7631 5169ff1acd97ff1c4ab83563c99f96f4 ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/inconsolata/i4-ts1.enc" 1455745497 9446 fe5580ca6042a44427f18d450942e7d0 ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
@@ -250,11 +250,11 @@
   "/usr/share/texmf/web2c/texmf.cnf" 1707919699 40399 f2c302f7d2af602abb742093540a5834 ""
   "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1767383865.29455 5472669 54eaf61a88b6b7896ebd0dac973cb29c ""
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1767383889 8212419 1640efe9f583fc298723dce7b8c8a551 ""
-  "opis.aux" 1773616221.91285 1990 7c8872f4f63b4ed831a98a1c7d5db028 "pdflatex"
+  "opis.aux" 1773681015.18504 1990 7c8872f4f63b4ed831a98a1c7d5db028 "pdflatex"
   "opis.bbl" 0 -1 0 "bibtex opis"
-  "opis.out" 1773616221.91385 2534 6428567b10e4413448e26819a8fb95da "pdflatex"
-  "opis.tex" 1773616221.31905 52973 65d4ea7dac075c06866cd666df3a5da3 ""
-  "opis.toc" 1773616221.91385 1012 40fd131a5ec08a5a1019fdfcff8aacb1 "pdflatex"
+  "opis.out" 1773681015.18504 2534 6428567b10e4413448e26819a8fb95da "pdflatex"
+  "opis.tex" 1773681014.58804 54004 891d43b3b433e3674346ec90318b5535 ""
+  "opis.toc" 1773681015.18639 1012 40fd131a5ec08a5a1019fdfcff8aacb1 "pdflatex"
   (generated)
   "opis.aux"
   "opis.log"
