@@ -272,13 +272,14 @@ Poniżej przedstawimy interpretację poszczególnych reguł wnioskowania w notac
 \hline
 
 \texttt{i. $\phi$    assumption}
+%DODAC REGULE CONTEXT
 &
 $$\displaystyle
 \overline{\ \texttt{$\phi\vdash\phi$}\ }\;(\mathrm{Ass})
 $$
 \\
 \hline
-\texttt{i. $\phi$ \quad   weakening, j}
+\texttt{i. $\phi$ \quad   weakening, j} %TO NAPRAWIĆ!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 &
 $$\displaystyle
 \frac{\texttt{Fitch(j)}}{\texttt{Fitch(i)}}\;(W)
@@ -741,7 +742,8 @@ Kolejną klasą jest klasa \texttt{Rule}, która reprezentuje regułę wnioskowa
 
 \section{Parsowanie dowodów w notacji Ficha}
 W celu kontroli poprawności dowodu w notacji Fitcha, jest on w programie parsowany do reprezentującej go struktury logicznej. Dowody reprezentujemy jako słownik, którego kluczami są indeksy linii, a wartościami 
-obiekty klasy \texttt{structure\_of\_line\_top\_down}. Klasa ta zawiera pola \texttt{Key}, które reprezentuje indeks linii, \texttt{args\_keys}, które reprezentują indeksy linii, które są używane jako przesłanki, 
+obiekty klasy \texttt{structure\_of\_line\_top\_down}.%OPISAC TO DODANE Z FORMUŁĄ Z ZAPISU!!!!!!!!!!!!!!!!!!!!
+ Klasa ta zawiera pola \texttt{Key}, które reprezentuje indeks linii, \texttt{args\_keys}, które reprezentują indeksy linii, które są używane jako przesłanki, 
 \texttt{rule}, które reprezentuje regułę wnioskowania, której używamy oraz, \texttt{LP}, które reprezentuje sekwent który koduje dana linia. Wartość \texttt{LP} jest generowana przez regule \texttt{top\_down} 
 zastosowaną dla przesłanek reprezentowanych przez \texttt{args\_keys} i pozostałych argumentów 
 Funkcja \texttt{\_\_init\_\_} tej klasy bierze za argument \texttt{Key}, \texttt{arg\_keys}, \texttt{rule}, a także \texttt{Proof\_so\_far}, które zawiera sparsowany do formy słownika dotychczasowy dowód, który 
@@ -786,7 +788,7 @@ przeszukiwania metodą prób i błędów. Ostateczna wersja rozszerza ten schema
 dekompozycję celu na podproblemy. Każda kolejna wersja wykorzystuje poprzednią jako
 komponent składowy. W dalszej części rozdziału omawiam kolejno wszystkie trzy strategie.
 
-
+%=======DODAŁEM MAKSYMALNĄ LICZBE NIEUDANYCH PRÓB Poprawić tu i w klasie node i wyjątek na za długą linię
 Pierwsza wersja systemu zawiera się w funkcji \texttt{silliest\_generate\_proof}. Jej argumenty to \texttt{bundle} będący obiektem klasy \texttt{NanoGPTBundle} 
 którym będziemy generować tekst dowodu, \texttt{prompt} który jest zmienną tekstową, która koduje twierdzenie, które mamy udowodnić, i ewentualnie początek dowodu, 
 zmienna \texttt{temperature} typu \texttt{float}, która pozwala kontrolować poziom determinizmu generacji oraz zmienna \texttt{max\_new\_lines} typu \texttt{int}, która określa ile linii 
@@ -923,6 +925,7 @@ z kolei kontekst dodatkowy to wszystkie formuły zawierające się w kontekście
 kontekstach bazowych: \texttt{unnormalised\_subproblems} i odpowiednio wydedukowane z 
 \texttt{SP.problem} pozostałe argumenty. Jeśli wynik tej funkcji jest taki sam jak \texttt{SP.problem} to funkcja \texttt{is\_smashed\_correctly} zwraca \texttt{True}, zaś w przeciwnym razie \texttt{False}.
 
+
 Format tekstowy zapisu rozbicia formuły jest następujący: w pierwszej lini mamy tekst \texttt{Smash: }, po którym zostaje zapisany sekwent który chcemy rozbić. Druga linia zaczyna się od napisu \texttt{With: }
 po którym następuje nazwa reguły której używamy do rozbicia. Trzecia linia zaczyna się od tekstu \texttt{To: } po którym w następuje pierwsza przesłanka na którą zostaje rozbity rozbijany sekwent. Kolejne sekwenty 
 rozbicia są zapisywane w kolejnych liniach po przecinku. Jeżeli Lista przesłanek jest pusta prompt kodujący rozbicie kończy się po prostu na \texttt{To: }.  Do sprawdzania czy dany tekst w tym formacie koduje 
@@ -949,6 +952,10 @@ Poza zmienną \texttt{Interior} klasa \texttt{node} zawiera też pole \texttt{Pa
 sekwentu w polu \texttt{Interior} lub zapytanie wraz z pełnym dowodem oraz pole \texttt{Probability}, które dla \texttt{SPNode} określa prawdopodobieństwo, że wybierzemy do analizy ten wierzchołek schodząc w dół od jego rodzica. Ostatnim polem jest zmienna boolowska \texttt{Value}. Dla liści typu \texttt{LittleProblem} ma wartość \texttt{False} jeśli w polu \texttt{Text} zawiera ona prompta jedynie z zapytaniem o dowód sekwentu i \texttt{True} jeśli w tym polu
 prompt składa się z zarówno zapytania jak i dowodu. Dla wierzchołków wewnętrznych rodzaju \texttt{LPNode} wartość \texttt{Value} to alternatywa wartości \texttt{Value} dzieci tego wierzchołka. Wierzchołek rodzaju \texttt{SPNode} może być liściem tylko wtedy, gdy lista przesłanek obiektu klasy \texttt{smashed\_problem} w zakodowanym w jego polu \texttt{Interior} jest pusta. Wtedy też wartość pola \texttt{Value} dla tego wierzchołka jest równa \texttt{True}. Dla wierzchołków wewnętrznych rodzaju \texttt{SPNode} pole \texttt{Value} jest równe koniunkcji wartości pól \texttt{Value} jego dzieci. 
 
+
+
+
+%DZIELE PRZEZ SUME WAG A NIE DEG
 Metoda \texttt{Smash\_Leaf} klasy \texttt{node} odpowiada za doczepianie do dzieci rodzaju \texttt{SPNode} które zawierają zakodowane rozbicia pola \texttt{Interior} swojego rodzica, a następnie doczepienia do tych dzieci ich dzieci
 rodzaju \texttt{LPNode} z przesłankami rozbicia kodowanego w ich rodzicach. Funkcja ta przyjmuje jako argumenty obiekt \texttt{bundle\_smashing} typu \texttt{NanoGPTBundle} odpowiadający za generowanie rozbić, oraz zmienna całkowitoliczbowa \texttt{deg} oznaczająca ile rozbić (nie koniecznie różnych) które będziemy wykonywać. Na początku tworzymy prompta zaczynającego się od \texttt{Smash: }, po którym następuje zapis sekwentu, który chcemy rozbijać i znak nowej lini. Następnie \texttt{deg} rzay przy pomocy metody \texttt{silliest\_generate\_smash} dopisujemy do tego prompta tekstową reprezentację rozbicia. Ponieważ częso model umie dość dobrze znajdować najkożystniejsze rozbicie, często one się powtażają. Dlatego tekstowe reprezentacje wygenerowanych rozbić przechowujemy jako klucze słwonika \texttt{weights}, w którym \texttt{weights[i]} jest równa liczbie ile razy uruchomiona funkcja \texttt{Smash\_Leaf} 
 wygenerowała \texttt{i}. Następnie do tabeli \texttt{Children} rozbijanego wierzchołka dodajemy obiekty klasy \texttt{node}, które w polu \texttt{Interior} mają zparsowaną przy pomocy \texttt{check\_smash\_from\_text} do obiektu klasy  \texttt{smashed\_problem} wygenerowaną wcześniej tekstową reprezentację rozbicia, z kolei w polu \texttt{Probability} ma iloraz liczby ile razy dana reprezentacja tekstowa została wygenerowana i liczby \texttt{deg}. Kolejnym krokiem jest dla każdego z tych dopisanych dzieci dopisanie do tabeli \texttt{Children} ich dzieci obiekty klasy \texttt{node}, które w polu \texttt{Interior} mają obiekty typu \texttt{LittleProblem} reprezentujące przesłanki rozbić zakodowanych w ich rodzicach. Załóżmy, że któreś z dzieci wierzchołka podanego jako argument dla funkcji \texttt{Smash\_Leaf} po wykonaniu wcześniej omawianych kroków nie ma dzieci. Oznacza to, że sekwent którego rozbicie jest zakodowane w tym dziecku nie potrzebuje dodatkowych kroków dowodu by go udowodnić. Ustawiamy wtedy pole \texttt{Value} tego dziecka na \texttt{True} i aktualizujemy wartości pola \texttt{Value} dla wszystkich jego przodków.

@@ -49,3 +49,4 @@ checkpoints/
 
 # Optional generated data
 # data/
+*.txt

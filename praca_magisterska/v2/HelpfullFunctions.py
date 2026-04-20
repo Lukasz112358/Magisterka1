@@ -13,7 +13,7 @@ from praca_magisterska.v2.ContextsAndLP import *
 
 
 def FreeVariables(Expr):
-    print()
+    print(Expr)
     if not (isinstance(Expr, Formula) or isinstance(Expr,Context)) or isinstance(Expr,Term):
         raise TypeError("Bad arguments")
     if isinstance(Expr, Variable):
@@ -150,22 +150,22 @@ def split_once(s: str, sep: str):
     return [prefix, postfix]
 split_once("Ala ma kota", " m")
 
-
+'''
 
 
 def atoms(f):
     if not isinstance(f, TermAndFormulas.Formula):
         raise TypeError("Bad argument")
     if isinstance(f, TermAndFormulas.Truth) or isinstance(f, TermAndFormulas.Lie):
-        return ContextsAndLP.Context()
+        return Context([])
     if isinstance(f, TermAndFormulas.Atom):
-        return ContextsAndLP.Context(f)
+        return Context(f)
     else:
-        ans = ContextsAndLP.Context()
+        ans = Context()
         for i in f.Interior:
             ans = ans + atoms(i)
     return ans
-
+'''
 def next_values(values):
     keys = values.keys()
     keys = sorted(keys,key = str)
@@ -179,7 +179,7 @@ def next_values(values):
         values[keys[i]] = TermAndFormulas.Truth()
     return values
 
-
+'''
 def isTautology(f):
     if not isinstance(f, TermAndFormulas.Formula):
         raise TypeError("Bad argument")
@@ -252,7 +252,7 @@ def randomTautology(depth, variables):
         x = (random.choice(atoms(Expr).formulas)).Arguments[0].name
         ans = SubstitutionSimple(t,x,Expr)
         return ans
-
+'''
 def to_infix(f):
     if isinstance(f, TermAndFormulas.Truth):
         return "⊤"
