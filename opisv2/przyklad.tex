@@ -5,11 +5,16 @@
 \documentclass[shortabstract]{iithesis}
 
 \usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
 \usepackage{longtable}
 \usepackage{amsmath,amssymb}
 \usepackage{amsthm}
 \usepackage{caption}
 \usepackage{bussproofs}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{float}
 \theoremstyle{definition}
 \newtheorem{definition}{Definicja}
 
@@ -164,7 +169,9 @@ regułami wnioskowania:
 
 \end{array}
 \]
+\label{tab:rules}
 \captionof{table}{Reguły wnioskowania rozważanego systemu}
+
 
 
 \end{center}
@@ -329,11 +336,22 @@ $$\displaystyle
 $$
 \\
 \hline
-\texttt{i. $\phi$ \quad   weakening, j} %TO NAPRAWIĆ!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+\texttt{j. $\psi \quad \dots$
+     \newline
+     \dots
+     \newline
+     k. $\phi \quad \dots$
+     \newline
+     \dots
+     \newline
+     i. $\phi$ \quad   weakening, j, k} %TO NAPRAWIĆ!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 &
 $$\displaystyle
-\frac{\texttt{Fitch(j)}}{\texttt{Fitch(i)}}\;(W)
+\frac{\texttt{Fitch(k)}}{\texttt{Fitch(i)}}\;(W)
 $$
+gdzie 
+\texttt{Fitch(i).assumptions = \newline Fitch(k).assumptions, \newline Fitch(j).conclusion } 
+
 \\
 \hline
 \texttt{j. $\phi \quad  \dots$
@@ -779,62 +797,693 @@ ich dopasowania do reguł wnioskowania, a także zweryfikować, czy formuła zap
 w danej linii odpowiada tezie kodowanego przez nią sekwentu.
 
 
+\chapter{Reprezentacja formuł, sekwentów,reguł wnioskowania i dowodów}
+\chaptermark{Reprezentacja systemu}
+
+Pierwszym etapem konstrukcji systemu było zdefiniowanie reprezentacji obiektów
+logicznych, na bazie których wykonywane będą dalsze operacje: parsowanie dowodów,
+sprawdzanie poprawności zastosowań reguł, generowanie danych treningowych oraz
+weryfikacja kroków proponowanych przez model językowy. Reprezentacja ta musiała
+spełniać dwa podstawowe wymagania. Po pierwsze, powinna wiernie odpowiadać
+formalizmowi dedukcji naturalnej opisanemu w poprzednim rozdziale. Po drugie,
+powinna umożliwiać łatwe przekształcanie obiektów logicznych na postać tekstową,
+ponieważ właśnie na takich tekstowych reprezentacjach uczony jest model językowy.
+
+\section{Reprezentacja formuł i sekwentów}
+
+Podstawowymi obiektami składniowymi są zmienne, relacje oraz formuły. W obecnej
+wersji systemu wykorzystywane są jedynie zmienne zdaniowe, jednak reprezentacja
+została zaprojektowana w sposób nieco ogólniejszy. Atom traktowany jest jako
+zastosowanie relacji do listy argumentów. W przypadku rachunku zdań wystarcza
+relacja jednoargumentowa, dlatego zapis taki jak \texttt{x} może być interpretowany
+jako uproszczona postać atomu. Takie rozwiązanie nie jest konieczne dla samego
+rachunku zdań, ale ułatwia ewentualne rozszerzenie systemu o bardziej ogólną
+składnię, na przykład o predykaty wieloargumentowe.
+
+Formuły złożone reprezentowane są rekurencyjnie. Formuła atomowa jest przypadkiem
+bazowym, natomiast negacja, koniunkcja, alternatywa, implikacja i równoważność
+przechowują swoje bezpośrednie podformuły. Dzięki temu struktura danych odpowiada
+drzewiastej strukturze składniowej formuły. Taka reprezentacja pozwala zarówno
+łatwo analizować postać formuły, jak i wykonywać operacje potrzebne przy stosowaniu
+reguł wnioskowania, na przykład odczytanie lewej i prawej strony implikacji czy koniunkcji.
+
+Kontekst dowodzenia reprezentuje zbiór formuł przyjętych jako założenia danego
+sekwentu. W implementacji został on podzielony na dwie części: kontekst bazowy oraz
+kontekst dodatkowy. Kontekst bazowy zawiera formuły traktowane jako założenia
+obowiązujące w całym rozważanym fragmencie dowodu. Kontekst dodatkowy zawiera
+natomiast formuły wprowadzane lokalnie przez reguły wnioskowania, na przykład
+przy wprowadzaniu implikacji, negacji albo przy rozumowaniu nie wprost.
+
+Podział ten nie zmienia znaczenia logicznego sekwentu, ale ma znaczenie techniczne
+i algorytmiczne. Pozwala odróżnić założenia, które powinny być stale dostępne
+podczas generowania poddowodu, od założeń lokalnych, które mogą być wprowadzane
+i usuwane przez konkretne reguły. Jest to szczególnie istotne później, gdy system
+będzie rozbijał jeden problem dowodowy na podproblemy oraz generował dowody
+sekwentów z niepustym kontekstem.
+
+Zdefiniowany wcześniej sekwent jest w systemie reprezentowany jako para złożona
+z kontekstu oraz tezy. W implementacji obiekt ten nosi nazwę \texttt{LittleProblem},
+ponieważ każdy sekwent można traktować jako mały problem dowodowy: należy
+wyprowadzić określoną tezę przy założeniu określonego kontekstu. Taka nazwa jest
+szczególnie naturalna w dalszej części pracy, gdzie większe problemy dowodowe będą
+rozbijane na mniejsze podproblemy.
+
+Reprezentacja sekwentu jest bezpośrednio wykorzystywana przez wszystkie dalsze
+komponenty programu: reguły wnioskowania przekształcają listy sekwentów-przesłanek
+w sekwenty-konkluzje, parser odtwarza sekwenty zakodowane w kolejnych liniach
+dowodu, a weryfikator sprawdza, czy dana linia rzeczywiście odpowiada sekwentowi
+otrzymanemu przez zastosowanie wskazanej reguły.
+\section{Reprezentacja reguł wnioskowania}
+
+Reguły wnioskowania zostały zaimplementowane jako osobne obiekty odpowiadające
+regułom systemu przedstawionym w Tabeli~\ref{tab:rules}, a także pomocniczym
+regułom \(\mathrm{FromContext}\) oraz \(\mathrm{FromWeakenContext}\). Na poziomie
+programu każda reguła działa przede wszystkim jako funkcja częściowa: dla poprawnej
+listy sekwentów-przesłanek zwraca sekwent będący konkluzją zastosowania tej reguły,
+natomiast dla danych, które nie pasują do jej schematu, zgłasza błąd.
+
+Można to opisać następującym schematem:
 
 
-\chapter{Ustawienie modelu}
-Bazą naszego systemu są klasy \texttt{Relation} o \texttt{Variable}. \texttt{Relation} reprezentuje relację, zawiera
-akceptowalne arności, nazwę relacji oraz metodę \texttt{toString}, która zwraca jej reprezentację tekstową. W naszym 
-modelu używamy jedynie zmiennych zdaniowych, więc wystarczyłoby jedynie użycie klasy reprezentacej zmienną
-jednak użycie klasy \texttt{Relation} pozwala na łatwe rozszerzenie modelu w przyszłości o predykaty wieloargumentowe.
-Dla uproszczenia zapisu dodajemy jednak dodajemy fukcję która wczytuje/wypisuje jedynie nazwy zmiennych i zmienną \texttt{x} interpretuje jako \texttt{'(x)}.
+\begin{algorithm}[H]
+\caption{Zastosowanie reguły wnioskowania}
+\begin{algorithmic}[1]
+\Procedure{ZastosujRegułę}{$R, P, A$}
+    \If{$P$ nie spełnia warunków wejściowych reguły $R$}
+        \State zgłoś błąd
+    \EndIf
+    \State $S \gets$ konkluzja reguły $R$ dla przesłanek $P$ i argumentów $A$
+    \State \Return $S$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+Warunki wejściowe obejmują zgodność liczby przesłanek, zgodności ich typów (każda przesłanka musi być sekwentem), oraz ich zgodności ze schematem danej reguły. 
+Argument \(R\) oznacza regułę wnioskowania, \(P\) oznacza
+listę sekwentów-przesłanek, natomiast \(A\)
+oznacza dodatkowe dane potrzebne w tych regułach, których zastosowanie nie jest
+jednoznacznie wyznaczone przez same przesłanki. Przykładowo w regule \((\vee I_1)\) z samej przesłanki można odczytać jedynie
+formułę \(\varphi\), ponieważ przesłanka ma postać \(\Gamma \vdash \varphi\).
+Aby skonstruować konkluzję
+\[
+    \Gamma \vdash \varphi \vee \psi,
+\]
+system musi dodatkowo znać formułę \(\psi\). Nie jest ona wyznaczona przez
+przesłankę, dlatego jest przekazywana jako dodatkowy argument zastosowania reguły.
+Analogiczna sytuacja występuje w regule \((\vee I_2)\), gdzie dodatkowym argumentem
+jest lewy składnik alternatywy.
+
+Istotne jest to, że niepoprawne zastosowanie reguły nie jest reprezentowane przez
+wartość logiczną \texttt{False}. Zamiast tego reguła zgłasza błąd. Jest to wygodne
+z punktu widzenia dalszej konstrukcji systemu, ponieważ zastosowanie reguły można
+traktować jako operację, która albo zwraca poprawnie skonstruowany sekwent, albo
+w ogóle nie jest zdefiniowana dla podanych argumentów. Dzięki temu w pozostałych
+częściach programu nie trzeba po każdym zastosowaniu reguły osobno sprawdzać,
+czy otrzymany wynik jest poprawny. Błędne kandydatury mogą być po prostu
+odrzucane przez przechwycenie błędu.
+
+\section{Reprezentacja dowodów}
+
+W poprzednim rozdziale przyjęliśmy, że każda linia dowodu koduje jeden sekwent.
+Na pierwszy rzut oka mogłoby się więc wydawać, że po sparsowaniu dowodu wystarczy
+przechowywać wyłącznie sekwenty odpowiadające kolejnym liniom. Takie rozwiązanie
+pozwalałoby odtworzyć, jakie sekwenty zostały kolejno otrzymane, ale traciłoby
+informację o tym, jak poszczególne kroki zostały uzasadnione.
+
+Sama reprezentacja sekwentu jest więc zbyt uboga jako reprezentacja linii dowodu.
+Sekwent jest logicznym rezultatem danej linii, natomiast linia zawiera również dane
+potrzebne do odtworzenia tego rezultatu: numer linii, formułę zapisaną jako jej tezę,
+użytą regułę wnioskowania oraz indeksy występujące w uzasadnieniu. Bez tych
+informacji sparsowany dowód byłby jedynie ciągiem otrzymanych sekwentów, a nie
+strukturą pozwalającą odtworzyć zależności między krokami.
+
+Sparsowana linia dowodu nie przechowuje oryginalnego tekstu linii, lecz informacje
+wydobyte z tego tekstu oraz sekwent odtworzony na ich podstawie. Do informacji
+odczytanych z zapisu należą: numer linii, lista indeksów występujących w jej
+uzasadnieniu, obiekt reprezentujący zastosowaną regułę oraz formuła zapisana jako
+teza linii. Na podstawie tych danych, a także wcześniej sparsowanej części dowodu,
+konstruowany jest sekwent kodowany przez daną linię.
 
 
-Klasa \texttt{Variable} reprezentuje zmienną, którą dajemy jako argument do relacji. Zawiera ona nazwę zmiennej oraz metodę zwracającą jej reprezentację tekstową.
+Można to przedstawić schematycznie w następujący sposób:
+\[
+\text{zapis linii}
+\quad\longrightarrow\quad
+(i,\varphi,R,J)
+\quad\longrightarrow\quad
+S_i.
+\]
+Tutaj \(i\) oznacza numer aktualnej linii, \(\varphi\) formułę zapisaną w tej linii,
+\(R\) zastosowaną regułę, natomiast \(J=(j_1,\ldots,j_n)\) oznacza ciąg indeksów
+podanych w uzasadnieniu linii. Indeksy te nie muszą być dokładnie listą przesłanek
+reguły wnioskowania, ale w zależności od reguły mogą również zawierać indeksy linii z których czerpiemy dodatkowe argumenty do wywołania tej reguły, które nie są przesłankami. 
+Na przykład linia postaci
+\[
+    \texttt{i. $\phi$ \quad   weakening, j, k}
+\]
+zawiera dwa indeksy, ale tylko jeden z nich wskazuje właściwą przesłankę reguły.
+Sekwent \(S_k\) jest sekwentem, który ma zostać osłabiony, natomiast linia \(j\)
+służy do odczytania formuły dodawanej do kontekstu. Jeśli więc
+\(S_k = \Gamma \vdash \phi\), a tezą linii \(j\) jest \(\psi\), to system konstruuje
+sekwent
+\[
+    \Gamma,\psi \vdash \phi.
+\]
+W tym przypadku dodatkowa formuła \(\psi\) nie pochodzi z formuły zapisanej
+w aktualnej linii, lecz z tezy wcześniejszej linii wskazanej przez jeden z indeksów
+w \(J\).
+
+Innynym przykładem jest linia postaci
+\[
+    \texttt{i. $\phi \lor \psi \quad$ $\lor$-introduction1, j}
+\]
+
+Tutaj indeks \(j\) wskazuje właściwą przesłankę, czyli wcześniejszy sekwent
+\(S_j = \Gamma \vdash \varphi\). Sama przesłanka nie wyznacza jednak formuły
+\(\psi\), która ma zostać dodana jako prawa strona alternatywy. System odczytuje
+ją więc z formuły zapisanej w aktualnej linii, czyli z prawego składnika
+\(\varphi \vee \psi\), i przekazuje ją jako dodatkowy argument reguły.
 
 
-Kolejną klasą jaką definiujemy jest klasa \texttt{Formula}, która reprezentuje formułę logiczną. Podstawową i 
-najprostszą formułą jest formuła \texttt{Atom}, której implementacja zawiera nazwę relacji którą reprezentuje oraz
-listę argumentów na których ona zachodzi. Poza formułą atomową mamy również klasy reprezentujące negację, 
-koniunkcję, alternatywę, implikację oraz równoważność. Klasy te zawiera swój typ oraz dwu lub jedno elementową
-listę podformuł w polu \texttt{Interior}.
+Jeszcze innym przypadkiem są reguły, które nie odwołują się do żadnej wcześniejszej
+linii. Przykładem jest linia postaci
+\[
+\texttt{1. $\phi$    assumption}
+\]
+W najprostszym przypadku odpowiada ona sekwentowi \(\phi \vdash \phi\). W naszym
+systemie sekwent konstruowany dla takiej linii może jednak zawierać również niepusty
+kontekst bazowy, obowiązujący w całym aktualnie rozważanym fragmencie dowodu.
+Tego kontekstu nie da się odczytać z wcześniejszych sparsowanych linii, ponieważ
+takowe jeszcze nie istnieją. Dlatego kontekst bazowy musi zostać przekazany explicite
+jako dodatkowy argument podczas konstruowania linii.
 
 
-Kolejną zaimplementowaną klasą jest klasa \texttt{Context}, która reprezentuje kontekst dowodzenia, czyli zbiór
-aktualnie przyjętych formuł. Z powodów które zostaną wyjaśnione w dalszej części pracy \texttt{Context} podzieliliśmy, na dwie listy: \texttt{base\_context} czyli formuły które przyjmujemy za prawdziwe w kontekście całego segmentu dowodu, oraz \texttt{additional\_context}, czyli formuły, które mogą zmieniać się w każdej linii dowodu. Obiekty klasy \texttt{Context} możemy sumować ze sobą jak zbiory metodą \texttt{union}, a także odejmować element, lub inny kontekst metodą \texttt{remove}. Operacje te wpływają jednak jedynie na \texttt{additional\_context}, zaś \texttt{base\_context} pozostaje bez zmian. Aby dwa konteksty można było od siebie odjąć lub dodać, muszą mieć takie samo \texttt{base\_context}, w przeciwnym wypadku zostaje zwrócony \texttt{TypeError("Bad arguments")}.
+Sparsowany dowód jest przechowywany jako słownik, który mapuje indeksy linii na
+odpowiadające im sparsowane linie. Jeżeli przez \(D\) oznaczymy taki słownik, to
+\(D[i]\) jest obiektem reprezentującym linię o numerze \(i\), a \(D[i].\mathrm{LP}\)
+oznacza sekwent odtworzony dla tej linii. Dzięki temu podczas parsowania kolejnej
+linii wystarczy odwołać się do indeksów zapisanych w jej uzasadnieniu i pobrać z
+\(D\) potrzebne wcześniej skonstruowane obiekty.
+
+Schematycznie parsowanie dowodu można więc opisać następująco:
+\[
+D_0 = \varnothing,
+\]
+\[
+D_i = D_{i-1} \cup \{\, i \mapsto L_i \,\},
+\]
+gdzie \(L_i\) jest sparsowaną postacią \(i\)-tej linii dowodu, skonstruowaną przy
+użyciu słownika \(D_{i-1}\). Oznacza to, że każda kolejna linia może korzystać
+wyłącznie z informacji odtworzonych dla wcześniejszych linii. Taki sposób parsowania
+odpowiada liniowej strukturze dowodu: późniejsze kroki mogą odwoływać się do
+wcześniejszych, ale nie odwrotnie.
+
+Po skonstruowaniu sparsowanej linii system sprawdza jeszcze, czy teza odtworzonego
+sekwentu jest identyczna z formułą zapisaną w tekście linii. Ten krok jest konieczny,
+ponieważ formuła występująca w zapisie linii jest traktowana jako deklaracja, a nie
+jako samodzielne źródło informacji o całym sekwencie. Jeżeli reguła zastosowana do
+odtworzonych przesłanek i argumentów prowadzi do innej tezy niż ta zapisana w
+linii, linia zostaje odrzucona. W ten sposób parser pełni jednocześnie rolę
+weryfikatora poprawności lokalnych kroków dowodu.
+
+Niepoprawna linia nie jest oznaczana specjalną wartością logiczną, lecz powoduje
+zgłoszenie błędu. Dotyczy to zarówno błędów składniowych, jak i sytuacji, w których
+indeksy zapisane w uzasadnieniu nie pozwalają skonstruować poprawnego zastosowania
+wskazanej reguły. Takie rozwiązanie upraszcza późniejsze etapy działania systemu.
+Podczas generowania korpusu lub sprawdzania linii proponowanych przez model
+językowy można po prostu próbować skonstruować sparsowaną linię; jeśli konstrukcja
+się powiedzie, linia jest poprawna, a jeśli pojawi się błąd, kandydatura zostaje
+odrzucona.
+
+Ta sama reprezentacja jest wykorzystywana przy generowaniu korpusu. Program nie
+tworzy linii treningowych przez ręczne sklejanie napisów, lecz najpierw konstruuje
+poprawny obiekt linii, a dopiero potem wypisuje go w ustalonym formacie tekstowym.
+Dzięki temu każda wygenerowana linia ma od razu odpowiadającą jej strukturę
+logiczną, którą parser potrafi ponownie odtworzyć.
 
 
-Sekwent reprezentuje klasa \texttt{LittleProblem}, która składa się z kontekstu w polu \texttt{assumptions} oraz tezy w polu \texttt{conclusion}.
-
-Kolejną klasą jest klasa \texttt{Rule}, która reprezentuje regułę wnioskowania. Dziedziczą po niej klasy
-
-\begin{itemize}
-    \item \texttt{Assumption}
-    \item \texttt{Weakening}
-    \item \texttt{ImplicationIntroduction}
-    \item \texttt{NegationIntroduction}
-    \item \texttt{ImplicationElimination}
-    \item \texttt{NegationElimination}
-    \item \texttt{ConjunctionIntroduction}
-    \item \texttt{DisjunctionIntroduction1}
-    \item \texttt{DisjunctionIntroduction2}
-    \item \texttt{TruthIntroduction}
-    \item \texttt{ConjunctionElimination1}
-    \item \texttt{ConjunctionElimination2}
-    \item \texttt{DisjunctionElimination}
-    \item \texttt{LieElimination}
-    \item \texttt{IffIntroduction}
-    \item \texttt{IffElimination1}
-    \item \texttt{IffElimination2}
-    \item \texttt{RAA}
-    \item \texttt{NegationOfNegation}
-    \item \texttt{TND}
-\end{itemize}
-, które reprezentują odpowiednie reguły wnioskowania. Każda z tych klas zawiera metodę \texttt{top\_down}, która bierze listę sekwentów będącymi przesłankami reguły. Niektóre reguły wymagają doatkowych niejednoznacznych argumentów. Np zgodnie z notacją w Tabeli \ref{tab:rules} reguła $\mathrm{(Ass)}$ wymaga znajomości formuły $\phi$ która może być dowolna, z kolei zastosowanie reguły $\mathrm{(RAA)}$, wymaga znajomości $\phi$, która jest dowolną formułą, której zanegowanie występuje w kontekście sekwentu podanego jako przesłanka. W takim wypadku podajemy te niejednoznaczne formuły, jako dodatkowy argument oprócz przesłanek. Również \texttt{base\_context} który zakładamy jako prawdziwy dla całego dowodu nie koniecznie da się wydedukować z listy przesłanek (chodzi o sytuacje dla reguł $\mathrm{(Ass)}$, $\mathrm{(TND)}$ i $(\top I$), gdzie lista przesłanek jest pusta. Wtedy konieczne jest podanie również bazowego kontekstu w formie listy formuł. Oprócz generacji konkluzji reguły \texttt{top\_down} sprawdza również, czy wszystkie podane argumenty są poprawne. Po pierwsze chodzi o to, czy \texttt{base\_context} kontekstów przesłanek są takie same, czy listy przesłanek mają odpowiednie długości i czy ich elementy są klasy \texttt{LittleProblem}. Kolejną kwestią jest to, czy argumenty, można faktycznie podstawić do danej reguły. Np czy dla reguły $\neg E$ teza pierwszej przesłanki jest negacją tezy drugiej przesłanki, lub  czy dla reguły $\mathrm{RAA}$ $\neg \phi$  jest w kontekście przesłanki, przy czym $\phi$ jest przechowywane w argumencie \texttt{phi} funkcji \texttt{top\_down} klasy \texttt{RAA}. Jeżeli argumenty nie spełniają odpowiednich warunków, zostaje zwrócony błąd \texttt{TypeError("Bad arguments")}.
 
 
-\chapter{Generowanie korpusu}
 
-\chapter{Trenowanie i kożystanie z modelu (NanoGPTBundle i te wszystkie funkcje z nim związane !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!, podkreślam WSZYSTKIE(liczenie prawdopodobieństwa, dodawanie tokenu, linii, trenowanie, dotrenowanie, ładowanie)!!!!)}
+
+\chapter{Strategie konstruowania dowodów}
+
+\section{Motywacja}
+Celem systemu nie jest jedynie wygenerowanie tekstu przypominającego dowód
+w dedukcji naturalnej, lecz znalezienie poprawnego dowodu danej tautologii.
+Model językowy pełni w tym procesie rolę generatora kandydatów: proponuje kolejne
+linie dowodu albo inne kroki pomocnicze, ale nie decyduje samodzielnie o ich
+poprawności. Każdy wygenerowany fragment musi zostać zweryfikowany przez opisany
+wcześniej parser i mechanizm sprawdzania reguł wnioskowania.
+
+Takie rozdzielenie ról jest kluczowe. Model językowy może dobrze naśladować składnię
+dowodów i często proponować sensowne kroki, ale sam z siebie nie gwarantuje
+poprawności logicznej. Może wygenerować linię o poprawnym wyglądzie, która jednak
+odwołuje się do niewłaściwych wcześniejszych linii, używa reguły w niepoprawny
+sposób albo wprowadza formułę, której nie da się uzasadnić w danym kontekście.
+Dlatego w systemie model nie jest traktowany jako samodzielny system, lecz jako źródło
+propozycji filtrowanych przez formalny weryfikator.
+
+Najprostsze podejście polega na liniowym dopisywaniu kolejnych linii dowodu.
+System przekazuje modelowi cel dowodowy oraz dotychczas wygenerowany fragment
+dowodu, a następnie próbuje dopisać jedną nową linię. Jeżeli po jej dopisaniu dowód
+nadal poprawnie się parsuje, linia zostaje zaakceptowana; w przeciwnym razie jest
+odrzucana. Proces generacji trwa do momentu uzyskania linii kodującej poszukiwany
+sekwent albo do chwili, w której dalsze rozszerzanie dowodu zostaje uznane za
+niecelowe. Tak powstaje pierwsza strategia, w której dowód konstruowany jest jako
+jedna rosnąca sekwencja lokalnie poprawnych kroków.
+
+Podejście to ma jednak istotne ograniczenie. Konstruowanie dowodu rzadko jest
+procesem całkowicie liniowym. Nawet jeśli każda kolejna linia jest poprawna, może
+okazać się, że wybrana ścieżka nie prowadzi do celu albo prowadzi do niego bardzo
+okrężną drogą. W praktyce potrzebne jest więc pewne przeszukiwanie przestrzeni
+możliwych częściowych dowodów: system powinien móc rozwijać kilka alternatywnych
+prób i wracać do bardziej obiecujących fragmentów. Tę ideę realizuje druga
+strategia, która przechowuje wiele częściowych dowodów i wybiera spośród nich te,
+które warto dalej rozwijać.
+
+Dla trudniejszych formuł nawet takie lokalne przeszukiwanie może być niewystarczające.
+Problemem nie jest wtedy tylko wybór następnej linii, lecz wybór ogólnego planu
+dowodu. Często łatwiej jest najpierw zdecydować, jaką regułą można byłoby otrzymać
+cel, a następnie spróbować udowodnić jej przesłanki jako osobne podproblemy. W ten
+sposób otrzymujemy trzecią strategię, w której system może rozbić początkowy
+problem na prostsze sekwenty, a następnie szukać dowodów dla nich. Strategia ta
+łączy generowanie dowodów w notacji liniowej z przeszukiwaniem drzewa problemów
+i podproblemów.
+
+Kolejne strategie powstały więc jako odpowiedź na ograniczenia poprzednich.
+Pierwsza strategia sprawdza, czy model potrafi lokalnie dopisywać poprawne linie
+dowodu. Druga dodaje mechanizm wyboru między wieloma częściowymi próbami,
+ale nadal wykorzystuje pierwszą strategię jako procedurę rozwijania pojedynczego
+fragmentu dowodu. Trzecia zmienia poziom poszukiwania: oprócz dopisywania linii
+pozwala planować dowód przez dekompozycję celu na podproblemy. Również ona nie
+zastępuje wcześniejszych metod, lecz korzysta z nich jako komponentów pomocniczych:
+po rozbiciu celu na podproblemy próbujemy znaleźć dowody tych podproblemów przy 
+użyciu drugiej strategii.
+
+W ten sposób strategie tworzą hierarchię. Każda kolejna strategia rozszerza
+poprzednią, traktując ją jako niezależny komponent realizujący prostsze zadanie. Dzięki
+temu system można opisywać warstwowo: najpierw jako generator pojedynczej
+poprawnej kontynuacji dowodu, następnie jako mechanizm przeszukiwania wielu
+takich kontynuacji, a ostatecznie jako procedurę rozbijania problemu dowodowego
+na mniejsze problemy, dla których ponownie uruchamiane są wcześniejsze mechanizmy.
+W dalszej części rozdziału strategie te zostaną opisane w tej kolejności.
+
+
+
+\section{Strategia pierwsza: liniowe dopisywanie kroków dowodu}
+
+\subsection{Idea strategii}
+
+Pierwsza strategia jest najprostszym sposobem wykorzystania modelu językowego
+w systemie dowodzącym. Jej celem jest sprawdzenie, czy model potrafi generować
+kolejne poprawne kroki dowodu w notacji liniowej, jeżeli otrzyma opis celu oraz
+dotychczasowy fragment dowodu. Strategia ta nie próbuje planować całego dowodu
+z góry ani nie rozważa wielu alternatywnych ścieżek. Dowód jest konstruowany
+sekwencyjnie: w każdym kroku system próbuje dopisać jedną nową linię do końca
+aktualnego fragmentu.
+
+W tym sensie strategia pierwsza traktuje model jako lokalny generator kontynuacji.
+Wejściem dla modelu jest prompt kodujący sekwent, który ma zostać udowodniony,
+oraz ewentualnie dotychczas wygenerowane linie dowodu. Wyjściem nie jest cały
+dowód, lecz kandydatura na następną linię. Poprawność tej kandydatury nie jest
+oceniana przez model, lecz przez formalny parser i mechanizm sprawdzania reguł
+wnioskowania.
+
+Schematycznie można to przedstawić następująco:
+\[
+\begin{array}{c}
+\text{częściowy}\\
+\text{dowód}
+\end{array}
+\longrightarrow
+\begin{array}{c}
+\text{propozycja}\\
+\text{następnej linii}
+\end{array}
+\longrightarrow
+\text{weryfikacja}
+\longrightarrow
+\begin{array}{c}
+\text{zaakceptowanie}\\
+\text{lub odrzucenie}
+\end{array}
+\]
+
+W implementacji tej strategii odpowiada podstawowa procedura lokalnego rozwijania
+częściowego dowodu, oznaczona jako \texttt{silliest\_generate\_proof}. Nazwa ta
+odzwierciedla prototypowy charakter pierwszej wersji algorytmu: strategia jest
+celowo prosta i służy jako punkt wyjścia dla bardziej złożonych metod opisanych
+w dalszej części rozdziału.
+
+
+\subsection{Generowanie i weryfikacja pojedynczej linii}
+
+Podstawowa operacja wykonywana przez strategię polega na próbie dopisania jednej
+nowej linii do aktualnego fragmentu dowodu. Nie odbywa się to jednak przez zupełnie
+swobodne wygenerowanie dowolnego ciągu znaków przez model. System narzuca
+częściową strukturę generowanej linii, tak aby model odpowiadał przede wszystkim
+za wybór formuły i uzasadnienia, a nie za odtwarzanie elementów czysto technicznych,
+takich jak numeracja linii.
+
+Najpierw analizowany jest aktualny prompt. Jeżeli zawiera on wyłącznie cel dowodowy,
+następna linia otrzymuje numer \(1\). Jeżeli w prompcie znajdują się już wcześniejsze
+linie dowodu, system odczytuje numer ostatniej z nich i rozpoczyna nową linię od
+kolejnego numeru. Dzięki temu model nie musi samodzielnie utrzymywać poprawnej
+numeracji dowodu, co zmniejsza liczbę błędów czysto składniowych.
+
+Następnie generowana jest formuła zapisana w nowej linii. Na tym etapie system
+ogranicza zbiór akceptowanych tokenów. Dopuszczalne są symbole logiczne, nawiasy,
+stałe \(\top\) i \(\bot\), spacje oraz zmienne występujące w dowodzonym sekwencie.
+Jeżeli dowód ma niepusty kontekst bazowy, zbiór dopuszczalnych zmiennych jest
+wyznaczany na podstawie zarówno tezy, jak i formuł występujących w kontekście.
+Celem tego ograniczenia jest uniknięcie sytuacji, w której model wprowadza do
+dowodu nowe, przypadkowe zmienne, niezwiązane z rozważanym problemem.
+
+Generowanie formuły trwa do momentu, w którym pojawi się separator oddzielający
+formułę od nazwy reguły uzasadniającej linię. W przyjętym formacie rolę tę pełnią cztery kolejne
+spacje. Po ich wygenerowaniu system przechodzi do drugiej części linii, czyli do
+uzasadnienia zawierającego nazwę reguły oraz ewentualne indeksy wcześniejszych
+linii. Ta część jest generowana już jako kontynuacja rozpoczętej linii i kończy się
+w momencie wygenerowania znaku nowej linii.
+
+Można to opisać schematycznie następująco:
+\[
+\text{prompt}
+\longrightarrow
+\text{numer nowej linii}
+\longrightarrow
+\text{formuła}
+\longrightarrow
+\text{uzasadnienie}.
+\]
+W implementacji ten etap odpowiada procedurze generowania następnej linii, która
+na podstawie aktualnego prompta tworzy kandydaturę na kolejną linię dowodu.
+
+Po wygenerowaniu kandydackiej linii system dopisuje ją tymczasowo do aktualnego
+fragmentu dowodu i próbuje ponownie sparsować całość. Sprawdzenie to nie ogranicza
+się do kontroli składni. Parser próbuje odtworzyć strukturę każdej linii,
+skonstruować odpowiadające jej sekwenty i zweryfikować, czy zastosowane reguły
+rzeczywiście prowadzą do zapisanych tez. Jeżeli parsowanie kończy się błędem,
+wygenerowana linia zostaje odrzucona.
+
+Kandydacka linia może zostać odrzucona z kilku powodów. Po pierwsze, może nie
+spełniać wymagań składniowych przyjętego formatu. Po drugie, może zawierać
+formułę niezgodną z ograniczeniami na zmienne występujące w dowodzonym problemie
+(sprawdzenie tego warunku jest defacto nadmiarowe, ponieważ jest on sprawdzany już na etapie generowania linii).
+Po trzecie, może wyglądać jak poprawna linia dowodu, ale odwoływać się do
+wcześniejszych linii w sposób niezgodny ze schematem wskazanej reguły. W każdym
+z tych przypadków parser lub weryfikator zgłasza błąd, a wygenerowana kandydatura
+nie jest dopisywana do dowodu.
+
+Jeżeli natomiast dopisanie linii nie powoduje błędu parsowania, linia zostaje
+zaakceptowana. Oznacza to, że udało się odtworzyć sekwent kodowany przez tę linię,
+a jego teza zgadza się z formułą zapisaną w tekście. Po zaakceptowaniu linii system
+traktuje ją tak samo jak wcześniejsze linie: może ona zostać wykorzystana jako
+uzasadnienie kolejnych kroków dowodu.
+
+W praktyce strategia działa więc jako pętla generowania i filtrowania. Jeśli przez
+\(D_k\) oznaczymy aktualny częściowy dowód, a przez \(\ell\) kandydaturę na nową
+linię, to po jej tymczasowym dopisaniu otrzymujemy
+\[
+D_{k+1}^{\ast}=D_k+\ell.
+\]
+Następnie system wykonuje weryfikację:
+\[
+D_{k+1}=
+\begin{cases}
+D_{k+1}^{\ast}, & \text{jeśli } D_{k+1}^{\ast} \text{ jest poprawny},\\
+D_k, & \text{w przeciwnym przypadku.}
+\end{cases}
+\]
+Takie rozwiązanie pozwala oddzielić zadanie generowania od zadania sprawdzania.
+Model językowy odpowiada za proponowanie potencjalnie sensownych kontynuacji,
+natomiast poprawność logiczna pozostaje kontrolowana przez formalny mechanizm
+opisany w poprzednim rozdziale.
+\subsection{Warunki zakończenia}
+
+Strategia kończy działanie sukcesem wtedy, gdy ostatnia zaakceptowana linia koduje
+sekwent docelowy. Innymi słowy, po sparsowaniu aktualnego fragmentu dowodu system
+sprawdza, czy sekwent odtworzony dla ostatniej linii jest równy sekwentowi, który
+miał zostać udowodniony. Jeśli tak jest, wygenerowany tekst stanowi pełny dowód
+celu.
+
+Działanie strategii może zakończyć się także bez znalezienia dowodu. Pierwszym
+ograniczeniem jest maksymalna liczba nowych linii, które wolno dopisać do prompta.
+Chroni to system przed generowaniem bardzo długich fragmentów, które lokalnie
+pozostają poprawne, ale nie zbliżają się do celu. Drugim ograniczeniem jest maksymalna
+liczba kolejnych nieudanych prób dopisania linii. Jeżeli model przez wiele prób
+z rzędu generuje kandydatury odrzucane przez parser, system uznaje, że dalsze
+kontynuowanie tej samej ścieżki jest mało obiecujące.
+
+W przypadku zakończenia bez sukcesu strategia może mimo to zwrócić częściowy
+dowód, czyli prompt z dopisanymi poprawnymi liniami. Taki fragment nie musi jeszcze
+dowodzić celu, ale może stanowić postęp względem punktu wyjścia. Właśnie dlatego
+pierwsza strategia może być później użyta jako komponent w strategii drugiej:
+nie musi samodzielnie zawsze znaleźć pełnego dowodu, wystarczy, że potrafi lokalnie
+rozwijać częściowy dowód o kolejne poprawne kroki.
+
+\subsection{Ograniczenia strategii}
+
+Największym ograniczeniem pierwszej strategii jest jej liniowy charakter. System
+rozwija tylko jedną ścieżkę dowodu i nie przechowuje alternatywnych kontynuacji.
+Jeżeli model wybierze poprawną, ale mało użyteczną linię, strategia nie ma mechanizmu
+powrotu do wcześniejszego stanu i wyboru innej możliwości. Może więc utknąć w
+ciągu kroków, które są lokalnie poprawne, ale nie prowadzą do dowodu celu.
+
+Drugim ograniczeniem jest brak globalnego planowania. Strategia nie analizuje
+struktury celu w taki sposób, aby zdecydować, jakie podcele warto najpierw osiągnąć.
+Każdy krok jest generowany na podstawie dotychczasowego tekstu dowodu, ale system
+nie rozważa jawnie, jaką regułą można byłoby zakończyć dowód ani jakie przesłanki
+należałoby wcześniej udowodnić. W prostych przypadkach lokalne dopisywanie linii
+może wystarczyć, ale dla bardziej złożonych formuł często potrzebne jest planowanie
+na wyższym poziomie.
+
+Skuteczność tej strategii zależy również od parametrów generacji, takich jak
+temperatura oraz liczba dopuszczalnych prób wygenerowania kolejnej linii. Nie jest
+to jednak osobny problem konstrukcyjny, lecz ogólna konsekwencja użycia modelu
+językowego jako generatora kandydatów.
+
+Mimo tych ograniczeń strategia pierwsza jest ważnym elementem całego systemu.
+Stanowi podstawowy mechanizm lokalnego rozszerzania dowodu, który może być
+używany jako komponent w bardziej złożonych metodach. Druga strategia zachowuje
+ten mechanizm generowania pojedynczych kroków, ale dodaje możliwość rozwijania
+wielu częściowych dowodów równolegle, co częściowo rozwiązuje problem utknięcia
+w jednej niekorzystnej ścieżce.
+
+
+\section{Strategia druga: przeszukiwanie wielu częściowych dowodów}
+
+\subsection{Motywacja}
+
+Pierwsza strategia konstruuje tylko jeden częściowy dowód. Oznacza to, że każda
+zaakceptowana linia staje się trwałą częścią aktualnej próby. Jeżeli później okaże się,
+że dana kontynuacja nie prowadzi w stronę rozwiązania, system nie ma możliwości
+powrotu do wcześniejszego etapu i wyboru innej ścieżki rozumowania. W praktyce
+jest to poważne ograniczenie, ponieważ poprawność lokalna pojedynczej linii nie
+gwarantuje jeszcze, że linia ta będzie użyteczna dla całego dowodu.
+
+Druga strategia próbuje ograniczyć ten problem przez jednoczesne przechowywanie
+wielu częściowych dowodów. Zamiast rozwijać wyłącznie jedną sekwencję linii, system
+utrzymuje zbiór kandydatów. W każdej iteracji wybierany jest jeden częściowy dowód,
+a następnie podejmowana jest próba dopisania do niego kolejnej poprawnej linii.
+Jeżeli powstały w ten sposób fragment jest poprawny i nie wystąpił wcześniej, zostaje
+dodany do zbioru kandydatów.
+
+Można więc powiedzieć, że druga strategia zmienia charakter generowania dowodu
+z liniowego dopisywania kolejnych kroków na przeszukiwanie przestrzeni częściowych
+dowodów. Pojedynczy nieoptymalny wybór nie przekreśla całego procesu, ponieważ
+inne częściowe dowody pozostają dostępne i mogą zostać rozwinięte w późniejszych
+iteracjach.
+
+Schematycznie można to przedstawić następująco:
+\[
+\small
+\begin{array}{c}
+\text{zbiór częściowych}\\[-0.2ex]
+\text{dowodów}
+\end{array}
+\;\longrightarrow\;
+\begin{array}{c}
+\text{wybór jednego}\\[-0.2ex]
+\text{kandydata}
+\end{array}
+\;\longrightarrow\;
+\begin{array}{c}
+\text{próba dopisania}\\[-0.2ex]
+\text{nowej linii}
+\end{array}
+\;\longrightarrow\;
+\begin{array}{c}
+\text{aktualizacja zbioru}\\[-0.2ex]
+\text{kandydatów}
+\end{array}.
+\]
+
+\subsection{Zbiór częściowych dowodów}
+
+Podstawową strukturą wykorzystywaną przez drugą strategię jest zbiór częściowych
+dowodów. Na początku zawiera on jedynie prompt opisujący sekwent, który należy
+udowodnić. W kolejnych iteracjach do zbioru dodawane są nowe częściowe dowody
+powstałe przez dopisanie poprawnej linii do jednego z wcześniej istniejących
+kandydatów.
+
+Każdy element tego zbioru jest tekstem zawierającym opis celu dowodowego oraz
+dotychczas wygenerowany fragment dowodu. Dzięki temu może zostać bezpośrednio
+podany modelowi językowemu jako kontekst generacji. 
+
+W każdej iteracji system wykonuje następujące kroki:
+\begin{algorithm}[H]
+\caption{Rozwijanie zbioru częściowych dowodów}
+\begin{algorithmic}[1]
+\State Wybierz częściowy dowód \(D\) ze zbioru kandydatów \(P\).
+\State Spróbuj dopisać do \(D\) jedną nową poprawną linię, otrzymując \(D'\).
+\State Sprawdź poprawność otrzymanego fragmentu \(D'\).
+\If{\(D'\) kończy dowód celu}
+    \State \Return \(D'\)
+\ElsIf{\(D'\) jest poprawnym nowym częściowym dowodem}
+    \State Dodaj \(D'\) do zbioru kandydatów \(P\).
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+
+Ważne jest, że druga strategia nie zastępuje mechanizmu generowania pojedynczej
+linii, lecz używa go jako podprocedury. Próba rozwinięcia częściowego dowodu nadal
+polega na tym, że model proponuje kandydacką linię, a formalny parser i weryfikator
+sprawdzają jej poprawność. Różnica polega na tym, że poprawne rozwinięcia nie
+muszą tworzyć jednej liniowej historii. Mogą współistnieć jako alternatywne ścieżki
+poszukiwania dowodu.
+
+\subsection{Ocena prawdopodobieństwa częściowego dowodu}
+
+Jeżeli zbiór częściowych dowodów zawiera wiele kandydatów, trzeba zdecydować,
+który z nich rozwijać w następnej iteracji. Najprostsze rozwiązanie polegałoby na
+losowaniu jednostajnym, jednak ignorowałoby ono informację dostarczaną przez model
+językowy. Model nie tylko generuje tekst, ale również przypisuje kolejnym tokenom
+prawdopodobieństwa. Można więc użyć tych prawdopodobieństw jako przybliżonej
+oceny tego, jak naturalny dla modelu jest dany częściowy dowód.
+
+Dla każdego częściowego dowodu obliczana jest wartość zależna od prawdopodobieństw
+tokenów tworzących wygenerowaną część dowodu. Ponieważ iloczyn wielu
+prawdopodobieństw bardzo szybko staje się liczbą bliską zeru, wygodniej sumować
+logarytmy prawdopodobieństw. Aby nie faworyzować nadmiernie krótkich fragmentów
+tylko dlatego, że składają się z mniejszej liczby tokenów, suma ta jest normalizowana
+przez długość analizowanego tekstu.
+
+Jeżeli częściowy dowód oznaczymy przez \(D\), a jego kolejne tokeny przez
+\(t_1,\ldots,t_m\), to jego ocenę można zapisać schematycznie jako
+\[
+    score(D)
+    =
+    \frac{1}{m}
+    \sum_{i=1}^{m}
+    \log P(t_i \mid t_1,\ldots,t_{i-1}, \text{prompt celu}).
+\]
+
+Nie jest to formalna miara poprawności dowodu. Poprawność nadal jest sprawdzana
+przez parser i implementację reguł wnioskowania. Ocena prawdopodobieństwa pełni
+inną funkcję: pozwala preferować te częściowe dowody, które są bardziej zgodne
+z rozkładem nauczonym przez model. Intuicyjnie są to fragmenty, które model uznaje
+za bardziej typowe lub bardziej podobne do przykładów widzianych podczas treningu.
+
+\subsection{Losowanie ścieżki do rozwinięcia}
+
+Oceny częściowych dowodów nie są używane do deterministycznego wyboru najlepszego
+kandydata. Zamiast tego są przekształcane na rozkład prawdopodobieństwa, z którego
+losowany jest dowód do rozwinięcia. Dzięki temu system częściej wybiera obiecujące
+fragmenty, ale nie eliminuje całkowicie fragmentów mniej prawdopodobnych.
+
+Takie rozwiązanie jest kompromisem między zachłannym wybieraniem najlepiej
+ocenionego kandydata a zupełnie losowym przeszukiwaniem. Strategia zachłanna
+mogłaby zbyt łatwo utknąć w jednej ścieżce, która wygląda dobrze lokalnie, ale nie
+prowadzi do zakończenia dowodu. Z kolei losowanie jednostajne nie wykorzystywałoby
+informacji o tym, które częściowe dowody model ocenia jako bardziej naturalne.
+
+Wagi kandydatów są więc normalizowane, na przykład przy użyciu funkcji softmax:
+\[
+    P(D_i)
+    =
+    \frac{\exp(score(D_i))}
+    {\sum_j \exp(score(D_j))}.
+\]
+Następnie w każdej iteracji losowany jest jeden częściowy dowód zgodnie z otrzymanym
+rozkładem i wykonywana jest próba jego rozwinięcia.
+
+Cały algorytm można zapisać następująco:
+\[
+\begin{array}{l}
+\textsc{StrategiaDruga}(G):\\[0.4ex]
+\quad P \gets \{\text{prompt opisujący cel } G\}\\
+\quad \textbf{dopóki} \text{ nie przekroczono limitu iteracji:}\\
+\qquad \text{oblicz oceny } score(D) \text{ dla } D \in P,\\
+\qquad \text{przekształć oceny na prawdopodobieństwa wyboru,}\\
+\qquad \text{wylosuj } D \in P,\\
+\qquad D' \gets \text{próba dopisania jednej poprawnej linii do } D,\\
+\qquad \textbf{jeśli } D' \text{ jest pełnym dowodem celu } G:\\
+\qquad\qquad \textbf{zwróć } D',\\
+\qquad \textbf{jeśli } D' \text{ jest poprawnym nowym częściowym dowodem:}\\
+\qquad\qquad P \gets P \cup \{D'\},\\
+\quad \textbf{zwróć informację o niepowodzeniu.}
+\end{array}
+\]
+
+W praktyce ostatni przypadek nie musi oznaczać, że dowód nie istnieje. Oznacza
+jedynie, że nie został znaleziony w ramach przyjętych limitów liczby iteracji,
+parametrów generacji oraz dostępnego zbioru częściowych dowodów.
+
+\subsection{Ograniczenia strategii}
+
+Druga strategia usuwa najważniejsze ograniczenie strategii liniowej: system nie jest
+już przywiązany do jednej ścieżki generacji. Może utrzymywać wiele alternatywnych
+częściowych dowodów i stopniowo rozwijać te, które wydają się bardziej obiecujące.
+Nie rozwiązuje to jednak wszystkich problemów związanych z automatycznym
+konstruowaniem dowodów.
+
+Po pierwsze, strategia nadal ma charakter lokalny. Rozwijanie częściowego dowodu
+polega na dopisaniu kolejnej linii, a nie na świadomym zaplanowaniu całej struktury
+dowodu. System może więc generować poprawne, ale mało użyteczne kroki, które
+zwiększają długość dowodu bez realnego przybliżania go do celu.
+
+Po drugie, ocena prawdopodobieństwa częściowego dowodu nie jest tym samym co
+ocena jego matematycznej przydatności. Model może wysoko oceniać fragmenty
+podobne do danych treningowych, ale nie oznacza to jeszcze, że są one najlepszą
+drogą do udowodnienia konkretnej tezy. Prawdopodobieństwo generacji jest więc
+heurystyką, a nie kryterium poprawności ani gwarancją sukcesu.
+
+Po trzecie, liczba możliwych częściowych dowodów rośnie bardzo szybko. Każda
+zaakceptowana linia może prowadzić do kolejnych rozwinięć, a wiele z nich może być
+formalnie poprawnych. W rezultacie strategia wymaga limitów liczby iteracji oraz
+mechanizmów wyboru kandydatów do rozwijania. Limity te są konieczne obliczeniowo,
+ale sprawiają, że przeszukiwanie pozostaje niepełne.
+
+Najważniejsze ograniczenie polega jednak na tym, że druga strategia nadal nie
+wykonuje dekompozycji celu na podcele. System próbuje znaleźć dowód przez
+rozszerzanie częściowych tekstowych dowodów, ale nie ma osobnego etapu, w którym
+analizuje strukturę dowodzonego sekwentu i wybiera regułę pozwalającą rozbić go
+na prostsze problemy. W trudniejszych przypadkach właśnie taka dekompozycja może
+być bardziej naturalna niż dopisywanie kolejnych linii od początku dowodu.
+
+To prowadzi do trzeciej strategii, w której system może najpierw rozbić dowodzony
+sekwent na listę prostszych podproblemów, a następnie próbować udowodnić każdy
+z nich osobno.
+
+\section{Strategia trzecia: dekompozycja celu i drzewo poszukiwania}
+\subsection{Motywacja}
+\subsection{Rozbicie problemu na podproblemy}
+\subsection{Format zapytania o rozbicie}
+\subsection{Sprawdzanie poprawności rozbicia}
+\subsection{Generowanie rozbić przez model}
+\subsection{Dwa typy wierzchołków drzewa}
+\subsection{Wartość wierzchołka}
+\subsection{Rozwijanie liścia}
+\subsection{Rekurencyjne przeszukiwanie drzewa}
+
+\section{Podsumowanie strategii}
+
+
+
+
+
 
 
 
@@ -1033,6 +1682,11 @@ odpowiadający za generowanie rozbić. Kolejnym argumentem jest zmienna zmiennop
 
 
 Kolejną metodą klasy \texttt{node} jest funkcja \texttt{TryNode}. Funkcja ta próbuje przeprowadzić cały dowód zadanego sekwentu a także jeśli to się nie uda zaktualizować drzewo tak by było bliższe znalezienia owego dowodu. Argumenty tej funkcji mają takie same nazwy, typy oraz zastosowania jak argumenty funkcji \texttt{RunLeaf}. Jeżeli znalezienie dowodu się powiedzie funkcja zwraca \texttt{True}, a w przeciwnym wypadku zwraca \texttt{False}. Działanie tej funkcji dzielimy na trzy nietrywialne przypadki przy czym przez znalezienie dowodu dla każdego z nich rozumiemy następująco. Dla przypadku liścia rodzaju \texttt{LPNode} jest to udowodnienie sekwentu zakodowanego w polu \texttt{Interior}, dla wierzchołków wewnętrznych rodzaju \texttt{LPNode} przez znalezienie dowodu rozumiemy znalezienie dowodu dla któregoś z jego dzieci, z kolei dla wierzchołków wewnętrznych rodzaju \texttt{SPNode} przez znalezienie dowodów dla wszystkich jego dzieci. Ostatnim trywialnym przypadkiem jest gdy wierzchołek wywołujący funkcję ma w polu \texttt{Value} wartość \texttt{True}, co oznacza, że dowód dla tego wierzchołka już został znaleziony i wtedy funkcja \texttt{TryNode}. zwraca \texttt{True}. Jeżeli obiekt wywołujący tą funkcję jest liściem typu \texttt{LPNode} uruchamiamy dla dla niego metody \texttt{RunLeaf}, z pozostałymi argumentami takimi samymi jak te podane jako argumenty dla \texttt{TryNode} i zwracamy jej wartość. Jeżeli jesteśmy w wierzchołku wewnętrznym rodzaju \texttt{LPNode} losujemy jego dziecko, króre jest rodzaju \texttt{SPNode} i  rekurencyjnie wykonujemy \texttt{TryNode} wywołane przez to dziecko z pozostałymi argumentami takimi samymi jak jak w wywołaniu dla jego rodzica i zwracamy wartość tego wywołania. Jeżeli zaś jesteśmy w wierzchołku \texttt{SPNode} wywołujemy funkcję \texttt{TryNode} dla kolejnych jego dzieci (pozostałe argumenty dla każdego dziecka są takie same jak dla wywołania dla rodzica), aż do momentu kiedy któreś z tych wywołań zwróci \texttt{False}. Wtedy wywołanie dla rodzica tych dzieci również zwraca \texttt{False}. Jeżeli każde wywołanie dla dzieci zwróci \texttt{True} to funkcja dla rodzica również zwraca \texttt{True}.
+
+\chapter{Generowanie korpusu}
+
+\chapter{Trenowanie i kożystanie z modelu (NanoGPTBundle i te wszystkie funkcje z nim związane !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!, podkreślam WSZYSTKIE(liczenie prawdopodobieństwa, dodawanie tokenu, linii, trenowanie, dotrenowanie, ładowanie)!!!!)}
+
 
 %%%%% BIBLIOGRAFIA
 

@@ -38,6 +38,7 @@ checkpoints/
 *.ckpt
 *.bin
 *.pkl
+*.epub
 
 # Big archives
 *.zip
