@@ -1358,8 +1358,8 @@ poszukiwania dowodu.
 
 Jeżeli zbiór częściowych dowodów zawiera wiele kandydatów, trzeba zdecydować,
 który z nich rozwijać w następnej iteracji. Najprostsze rozwiązanie polegałoby na
-losowaniu jednostajnym, jednak ignorowałoby ono informację dostarczaną przez model
-językowy. Model nie tylko generuje tekst, ale również przypisuje kolejnym tokenom
+losowaniu jednostajnym, jednak ignorowałoby ono to, że nie wszystkie częściowe dowody są tak samo prawdopodobne.
+Model nie tylko generuje tekst, ale również przypisuje kolejnym tokenom
 prawdopodobieństwa. Można więc użyć tych prawdopodobieństw jako przybliżonej
 oceny tego, jak naturalny dla modelu jest dany częściowy dowód.
 
@@ -1380,56 +1380,74 @@ Jeżeli częściowy dowód oznaczymy przez \(D\), a jego kolejne tokeny przez
     \log P(t_i \mid t_1,\ldots,t_{i-1}, \text{prompt celu}).
 \]
 
-Nie jest to formalna miara poprawności dowodu. Poprawność nadal jest sprawdzana
-przez parser i implementację reguł wnioskowania. Ocena prawdopodobieństwa pełni
-inną funkcję: pozwala preferować te częściowe dowody, które są bardziej zgodne
-z rozkładem nauczonym przez model. Intuicyjnie są to fragmenty, które model uznaje
-za bardziej typowe lub bardziej podobne do przykładów widzianych podczas treningu.
+Wartość \(score(D)\) jest jednak nieokreślona, gdy \(m=0\), czyli dla początkowego
+prompta, który nie zawiera jeszcze żadnych wygenerowanych tokenów. W takim przypadku
+najpierw wyliczamy \(score\) dla pozostałych częściowych dowodów, a następnie
+ustawiamy \(score\) dla pustego prompta na wartość średnią z tych ocen. Intuicja
+jest taka, że początkowy prompt nie powinien być ani stale faworyzowany, ani całkowicie
+pomijany. Z jednej strony nie zawiera on jeszcze żadnego postępu w konstrukcji
+dowodu, więc zbyt częste wybieranie go prowadziłoby do wielokrotnego rozpoczynania
+generacji od początku. Z drugiej strony jest to kandydat najbardziej neutralny:
+nie zawiera żadnych wcześniejszych decyzji, które mogłyby skierować dowód w mało
+użyteczną stronę. Przypisanie mu średniej oceny pozwala więc zachować możliwość
+powrotu do początku rozumowania, ale nie czyni z niego domyślnie najatrakcyjniejszej
+ścieżki.
 
-\subsection{Losowanie ścieżki do rozwinięcia}
 
-Oceny częściowych dowodów nie są używane do deterministycznego wyboru najlepszego
-kandydata. Zamiast tego są przekształcane na rozkład prawdopodobieństwa, z którego
-losowany jest dowód do rozwinięcia. Dzięki temu system częściej wybiera obiecujące
-fragmenty, ale nie eliminuje całkowicie fragmentów mniej prawdopodobnych.
-
-Takie rozwiązanie jest kompromisem między zachłannym wybieraniem najlepiej
-ocenionego kandydata a zupełnie losowym przeszukiwaniem. Strategia zachłanna
-mogłaby zbyt łatwo utknąć w jednej ścieżce, która wygląda dobrze lokalnie, ale nie
-prowadzi do zakończenia dowodu. Z kolei losowanie jednostajne nie wykorzystywałoby
-informacji o tym, które częściowe dowody model ocenia jako bardziej naturalne.
-
-Wagi kandydatów są więc normalizowane, na przykład przy użyciu funkcji softmax:
+Kolejnym problemem jest to, że wartości \(score(D)\), jako średnie logarytmów
+prawdopodobieństw, są w praktyce niedodatnie. Mogą być równe \(0\) jedynie w
+granicznym przypadku, gdy każdy kolejny token ma prawdopodobieństwo warunkowe
+równe \(1\). Ponadto wartości te nie sumują się do \(1\), a więc nie mogą być
+bezpośrednio interpretowane jako rozkład prawdopodobieństwa. Aby przekształcić je
+w rozkład na zbiorze kandydatów, używamy funkcji softmax:
 \[
     P(D_i)
     =
     \frac{\exp(score(D_i))}
     {\sum_j \exp(score(D_j))}.
 \]
-Następnie w każdej iteracji losowany jest jeden częściowy dowód zgodnie z otrzymanym
-rozkładem i wykonywana jest próba jego rozwinięcia.
+W ten sposób każdemu częściowemu dowodowi przypisana zostaje dodatnia wartość,
+a suma wszystkich takich wartości wynosi \(1\). Kandydaci o wyższym wyniku
+\(score\), czyli bardziej prawdopodobni według modelu, otrzymują większe
+prawdopodobieństwo wyboru w następnej iteracji.
 
-Cały algorytm można zapisać następująco:
-\[
-\begin{array}{l}
-\textsc{StrategiaDruga}(G):\\[0.4ex]
-\quad P \gets \{\text{prompt opisujący cel } G\}\\
-\quad \textbf{dopóki} \text{ nie przekroczono limitu iteracji:}\\
-\qquad \text{oblicz oceny } score(D) \text{ dla } D \in P,\\
-\qquad \text{przekształć oceny na prawdopodobieństwa wyboru,}\\
-\qquad \text{wylosuj } D \in P,\\
-\qquad D' \gets \text{próba dopisania jednej poprawnej linii do } D,\\
-\qquad \textbf{jeśli } D' \text{ jest pełnym dowodem celu } G:\\
-\qquad\qquad \textbf{zwróć } D',\\
-\qquad \textbf{jeśli } D' \text{ jest poprawnym nowym częściowym dowodem:}\\
-\qquad\qquad P \gets P \cup \{D'\},\\
-\quad \textbf{zwróć informację o niepowodzeniu.}
-\end{array}
-\]
 
-W praktyce ostatni przypadek nie musi oznaczać, że dowód nie istnieje. Oznacza
-jedynie, że nie został znaleziony w ramach przyjętych limitów liczby iteracji,
-parametrów generacji oraz dostępnego zbioru częściowych dowodów.
+\subsection{Pełny przebieg strategii}
+
+Po wprowadzeniu zbioru częściowych dowodów oraz sposobu przypisywania im
+prawdopodobieństw wyboru można przedstawić całą drugą strategię jako jedną pętlę
+przeszukiwania. W każdej iteracji system aktualizuje oceny kandydatów, wybiera jeden
+z częściowych dowodów zgodnie z rozkładem otrzymanym po zastosowaniu funkcji
+softmax, a następnie próbuje rozwinąć go o jedną poprawną linię.
+
+\begin{algorithm}[H]
+\caption{Przeszukiwanie wielu częściowych dowodów}
+\begin{algorithmic}[1]
+\State \(P \gets \{\text{prompt opisujący cel } G\}\)
+\While{nie przekroczono limitu iteracji}
+    \State Oblicz wartości \(score(D)\) dla kandydatów \(D \in P\).
+    \State Przekształć wartości \(score(D)\) w rozkład prawdopodobieństwa na \(P\).
+    \State Wylosuj częściowy dowód \(D \in P\) zgodnie z otrzymanym rozkładem.
+    \State Spróbuj dopisać do \(D\) jedną poprawną linię, otrzymując \(D'\).
+    \If{\(D'\) jest pełnym dowodem celu \(G\)}
+        \State \Return \(D'\)
+    \ElsIf{\(D'\) jest poprawnym nowym częściowym dowodem}
+        \State \(P \gets P \cup \{D'\}\)
+    \EndIf
+\EndWhile
+\State \Return informacja o niepowodzeniu
+\end{algorithmic}
+\end{algorithm}
+
+W powyższym schemacie etap dopisania nowej linii korzysta z procedury opisanej
+przy pierwszej strategii. Druga strategia nie zmienia więc sposobu weryfikacji
+pojedynczego kroku dowodu, lecz zmienia organizację całego procesu poszukiwania:
+zamiast jednej rozwijanej sekwencji utrzymywany jest zbiór alternatywnych prób,
+spośród których kolejne są wybierane probabilistycznie.
+
+Niepowodzenie algorytmu oznacza jedynie, że dowód nie został znaleziony w ramach
+przyjętych ograniczeń obliczeniowych. Nie jest to informacja o niedowodliwości
+danego sekwentu.
 
 \subsection{Ograniczenia strategii}
 
@@ -1467,6 +1485,524 @@ To prowadzi do trzeciej strategii, w której system może najpierw rozbić dowod
 sekwent na listę prostszych podproblemów, a następnie próbować udowodnić każdy
 z nich osobno.
 
+
+
+
+
+\section{Strategia trzecia: dekompozycja celu i drzewo poszukiwania}
+
+
+\subsection{Motywacja}
+
+Druga strategia pozwala prowadzić wiele częściowych dowodów równolegle, dzięki
+czemu system nie jest przywiązany do jednej liniowej ścieżki generacji. Nadal jednak
+rozwijanie dowodu odbywa się przez dopisywanie kolejnych linii do już istniejącego
+fragmentu. System wybiera więc pewien częściowy dowód i próbuje znaleźć jego
+następny poprawny krok. Nie analizuje natomiast osobno, jaka ogólna struktura
+dowodu byłaby potrzebna, aby otrzymać zadany sekwent.
+
+Taki sposób działania odpowiada naturalnemu zapisowi dowodu w notacji Fitcha:
+zaczynamy od założeń, aksjomatów lub wcześniej uzyskanych sekwentów, a następnie
+stosujemy reguły wnioskowania, aby dojść do tezy. Jest to konstruowanie dowodu
+w kierunku od przesłanek do celu. W wielu sytuacjach wygodny jest jednak kierunek
+przeciwny. Zamiast pytać, jaką kolejną linię można dopisać do częściowego dowodu,
+można zacząć od sekwentu, który chcemy udowodnić, i zapytać, jakie prostsze
+sekwenty wystarczyłoby udowodnić, aby otrzymać go przez zastosowanie jednej
+z reguł wnioskowania.
+
+Można więc patrzeć na konstrukcję dowodu z dwóch stron. Pierwsza strategia buduje
+dowód od wcześniejszych linii ku końcowej tezie. Trzecia strategia zaczyna od celu
+i próbuje rozłożyć go na podcele, które następnie mogą być dowodzone osobno.
+W notacji drzewiastej odpowiada to budowaniu drzewa dowodu od korzenia ku
+liściom: w korzeniu znajduje się sekwent, który chcemy udowodnić, a kolejne poziomy
+drzewa zawierają przesłanki reguł, których udowodnienie wystarcza do otrzymania
+sekwentów znajdujących się wyżej.
+
+Przykładowo, jeżeli celem jest udowodnienie koniunkcji, naturalnym krokiem jest
+próba udowodnienia osobno jej dwóch składników. Jeżeli celem jest udowodnienie
+implikacji, można przyjąć jej poprzednik jako dodatkowe założenie i następnie
+spróbować udowodnić jej następnik. W obu przypadkach nie zaczynamy od pytania
+o pierwszą linię dowodu, lecz od pytania o to, jakie podproblemy prowadzą do
+rozwiązania problemu wyjściowego.
+
+Trzecia strategia rozszerza więc wcześniejsze podejścia o możliwość dekompozycji
+celu. System może najpierw rozbić dowodzony sekwent na listę prostszych
+podproblemów, a dopiero potem próbować udowodnić każdy z nich za pomocą
+wcześniejszych metod generowania dowodów. Jeżeli wszystkie podproblemy danego
+rozbicia zostaną rozwiązane, to rozwiązany zostaje również problem wyjściowy.
+
+\subsection{Rozbicie problemu na podproblemy}
+
+Rozbiciem problemu na podproblemy nazywamy wskazanie takiej reguły
+wnioskowania oraz takiej listy sekwentów-przesłanek, że sekwent wyjściowy
+można otrzymać przez zastosowanie tej reguły do tych przesłanek.
+
+Aby zapisać to precyzyjniej, dla każdej reguły \(R\) oraz listy sekwentów
+\(S_1,\ldots,S_n\) wprowadzamy oznaczenie
+\[
+R(S_1,\ldots,S_n),
+\]
+które oznacza zbiór wszystkich sekwentów mogących wystąpić jako konkluzje
+poprawnego zastosowania reguły \(R\) do przesłanek \(S_1,\ldots,S_n\).
+
+
+Jeżeli więc chcemy udowodnić sekwent \(S\), to szukamy reguły \(R\) oraz
+sekwentów \(S_1,\ldots,S_n\), dla których zachodzi
+\[
+S \in R(S_1,\ldots,S_n).
+\]
+Wtedy zadanie udowodnienia \(S\) można zastąpić zadaniami udowodnienia
+\(S_1,\ldots,S_n\).
+
+Takie rozbicie można interpretować jako jeden krok budowania drzewa dowodu
+w kierunku przeciwnym do kierunku zapisu dowodu w notacji Fitcha. W notacji
+Fitcha zaczynamy zwykle od prostych przesłanek i dopisujemy kolejne linie aż
+do uzyskania celu. W dekompozycji celu zaczynamy natomiast od sekwentu,
+który chcemy otrzymać, i pytamy, jakie przesłanki mogłyby prowadzić do niego
+przez jedną z reguł wnioskowania.
+
+Schematycznie:
+\[
+\small
+\begin{array}{c}
+\text{problem}\\[-0.2ex]
+S
+\end{array}
+\;\longrightarrow\;
+\begin{array}{c}
+\text{wybór}\\[-0.2ex]
+\text{reguły } R
+\end{array}
+\;\longrightarrow\;
+\begin{array}{c}
+\text{podproblemy}\\[-0.2ex]
+S_1,\ldots,S_n
+\end{array}
+\]
+przy czym warunkiem poprawności rozbicia jest
+\[
+S \in R(S_1,\ldots,S_n).
+\]
+
+Rozbicie z założenia powinny generować podproblemy o dowodach prostszych niż dowód problemu początkowego.
+Co więcej trzecia strategia nie zastępuje generowania dowodów liniowych, ale
+organizuje je w większą strukturę: zamiast od razu znaleźć jeden
+pełny dowód sekwentu, system może rozbić go na mniejsze sekwenty i dla
+każdego z nich uruchomić szukanie dowodu w formie liniowej. Szukanie to odbywa się
+przy pomocy strategii drugiej.
+
+
+\subsection{Format zapytania o rozbicie}
+
+W trzeciej strategii model językowy jest używany nie tylko do generowania kolejnych
+linii dowodu, lecz także do proponowania rozbić celu na podproblemy. Jest to osobne
+zadanie generatywne. W przypadku dowodzenia liniowego model otrzymuje zapis celu
+oraz dotychczasowy fragment dowodu i ma zaproponować jego dalszy ciąg. W przypadku
+rozbijania problemu model otrzymuje sekwent, który chcemy udowodnić, i ma wskazać
+regułę wnioskowania oraz listę podproblemów, których udowodnienie pozwoli otrzymać
+sekwent wyjściowy.
+
+Z tego powodu w systemie wykorzystywane są dwa modele językowe o tej samej
+architekturze transformera, ale trenowane na różnych typach danych. Pierwszy model
+uczy się generować dowody w notacji tekstowej, czyli dopisywać kolejne linie
+częściowego dowodu. Drugi model uczy się generować rozbicia problemów na
+podproblemy. Oba modele korzystają z podobnej idei: proponują tekstowy kandydat,
+który następnie jest sprawdzany przez formalny parser i mechanizm weryfikacji
+poprawności. Różnią się natomiast formatem danych treningowych oraz rodzajem
+tekstu, który mają wygenerować.
+
+Aby drugi model mógł być trenowany i używany w taki sam sposób jak model
+dowodzący, rozbicia muszą zostać zapisane w jednoznacznym formacie tekstowym.
+Format ten powinien określać trzy informacje: sekwent, który jest rozbijany, regułę
+wnioskowania używaną do rozbicia oraz listę sekwentów-przesłanek otrzymanych po
+zastosowaniu tej reguły.
+
+W systemie rozbicie zapisywane jest jako tekst o następującym formacie:
+\[
+\begin{array}{l}
+\texttt{Smash: } S\\
+\texttt{With: } R\\
+\texttt{To: } S_1,\\
+\ldots\\
+S_n
+\end{array}
+\]
+gdzie \(S\) jest sekwentem, który chcemy rozbić, \(R\) jest nazwą reguły
+wnioskowania, a \(S_1,\ldots,S_n\) są sekwentami-przesłankami otrzymanymi po
+rozbiciu.
+
+Pierwsza linia określa problem wyjściowy. Druga linia wskazuje regułę, za pomocą
+której problem ma zostać rozbity. Kolejne linie zawierają listę podproblemów. Jeżeli
+reguła nie wymaga żadnych przesłanek (np reguła \texttt{Assumption}), lista podproblemów jest pusta. 
+
+Przykładowy schemat rozbicia można zapisać następująco:
+\[
+\begin{array}{l}
+\texttt{Smash: } \Gamma \vdash \varphi \to \psi\\
+\texttt{With: } \to\texttt{-introduction}\\
+\texttt{To: } \Gamma,\varphi \vdash \psi
+\end{array}
+\]
+Taki zapis oznacza, że problem udowodnienia implikacji został zastąpiony problemem
+udowodnienia jej prawej strony przy dodatkowym założeniu jej lewej strony.
+
+
+
+
+\subsection{Sprawdzanie poprawności rozbicia}
+
+Ponieważ rozbicia są generowane przez model językowy, każde wygenerowane rozbicie
+musi zostać sprawdzone formalnie. Rozbicie składa się z problemu wyjściowego \(S\),
+reguły \(R\) oraz listy podproblemów \(S_1,\ldots,S_n\). Jest poprawne wtedy, gdy
+zastosowanie reguły \(R\) do podproblemów pozwala otrzymać problem wyjściowy.
+
+W implementacji reguły wnioskowania mogą być stosowane tylko do sekwentów,
+które mają ten sam kontekst bazowy. Dlatego przed sprawdzeniem rozbicia wszystkie
+podproblemy sprowadzane są do postaci z pustym kontekstem bazowym. Cały ich
+kontekst logiczny zostaje przeniesiony do kontekstu dodatkowego. Jeżeli podproblem
+ma kontekst bazowy \(\Gamma_b\), kontekst dodatkowy \(\Gamma_d\) i tezę \(\varphi\),
+to zastępujemy go sekwentem
+\[
+    \emptyset ; \Gamma_b,\Gamma_d \vdash \varphi.
+\]
+Średnik oddziela tutaj kontekst bazowy od kontekstu dodatkowego.
+
+Tak samo przekształcany jest problem wyjściowy \(S\). Nie jest to potrzebne do
+samego zastosowania reguły, ale upraszcza końcowe porównanie: wynik zastosowania
+reguły do przekształconych podproblemów porównujemy z problemem wyjściowym
+zapisanym w tej samej konwencji.
+
+Procedura sprawdzania wygląda więc następująco:
+\[
+\begin{array}{l}
+\textsc{SprawdźRozbicie}(S,R,S_1,\ldots,S_n):\\[0.4ex]
+\quad \text{sprowadź } S \text{ do postaci z pustym kontekstem bazowym,}\\
+\quad \text{sprowadź każde } S_i \text{ do postaci z pustym kontekstem bazowym,}\\
+\quad \text{sprawdź pomocniczo, czy każde } S_i \text{ jest sekwentem tautologicznym,}\\
+\quad \text{wyznacz dodatkowe argumenty potrzebne regule } R,\\
+\quad \text{spróbuj zastosować } R \text{ do przekształconych podproblemów,}\\
+\quad \text{jeżeli zastosowanie reguły zgłasza błąd, odrzuć rozbicie,}\\
+\quad \text{jeżeli otrzymany sekwent jest różny od przekształconego } S,
+      \text{ odrzuć rozbicie,}\\
+\quad \text{w przeciwnym przypadku zaakceptuj rozbicie.}
+\end{array}
+\]
+
+Dodatkowe argumenty są potrzebne dla tych reguł, których zastosowanie nie jest
+jednoznacznie wyznaczone przez same przesłanki. Na przykład przy regule
+\(\vee I_1\) trzeba wskazać prawy składnik alternatywy, a przy \(RAA\) formułę,
+której dowodzimy przez sprowadzenie jej negacji do sprzeczności. W takich przypadkach
+brakujące dane są odczytywane z problemu wyjściowego.
+
+Sprawdzanie tautologiczności podproblemów jest elementem pomocniczym. Nie jest
+konieczne do stwierdzenia, czy rozbicie pasuje do schematu reguły, ale pozwala
+odrzucić rozbicia prowadzące do podproblemów, których system i tak nie byłby
+w stanie udowodnić. Jest to uproszczenie przyjęte ze względu na prototypowy
+i eksperymentalny charakter systemu oraz niewielki rozmiar rozważanych formuł.
+Nie zastępuje ono generowania dowodu: zaakceptowany podproblem nadal musi mieć
+formalny dowód, którego kolejne linie są sprawdzane przez parser i reguły
+wnioskowania.
+
+\subsection{Generowanie rozbić przez model}
+
+Rozbicia są generowane przez model językowy w podobny sposób jak kolejne linie
+dowodu. Model otrzymuje początek tekstu zawierający linię \texttt{Smash:} z opisem
+sekwentu, który ma zostać rozbity, a następnie próbuje dopisać dalszą część opisu:
+wybraną regułę oraz listę podproblemów. Wygenerowany kandydat jest następnie
+sprawdzany przez procedurę weryfikującą rozbicie.
+
+Schemat generowania pojedynczego poprawnego rozbicia wygląda następująco:
+\[
+\begin{array}{l}
+\textsc{WygenerujRozbicie}(S):\\[0.4ex]
+\quad \text{utwórz prompt zaczynający się od } \texttt{Smash: } S,\\
+\quad \text{wygeneruj dalsze linie opisu rozbicia,}\\
+\quad \text{sprawdź, czy tekst ma pełny format rozbicia,}\\
+\quad \text{sprawdź formalną poprawność rozbicia,}\\
+\quad \text{jeżeli rozbicie jest poprawne, zwróć je,}\\
+\quad \text{w przeciwnym przypadku ponów próbę generacji.}
+\end{array}
+\]
+
+W praktyce dla jednego problemu można wygenerować kilka rozbić. Część z nich może
+się powtarzać, ponieważ model często wskazuje te same najbardziej naturalne reguły.
+Powtórzenia nie są całkowicie bezużyteczne: można je traktować jako informację
+o tym, które rozbicia model wybiera najchętniej. Dlatego częstości występowania
+poszczególnych rozbić mogą zostać użyte jako wagi przy późniejszym wyborze gałęzi
+drzewa poszukiwania.
+
+\subsection{Dwa typy wierzchołków drzewa}
+
+Aby połączyć dekompozycję celu z generowaniem dowodów częściowych, system buduje
+drzewo poszukiwania. W drzewie tym występują dwa rodzaje wierzchołków.
+
+Pierwszy rodzaj wierzchołków reprezentuje problemy dowodowe, czyli sekwenty do
+udowodnienia. Będziemy je nazywać wierzchołkami typu \(LP\), ponieważ odpowiadają
+obiektom reprezentującym pojedynczy sekwent. Dzieciami takiego wierzchołka są
+możliwe rozbicia danego sekwentu.
+
+Drugi rodzaj wierzchołków reprezentuje konkretne rozbicia problemu na podproblemy.
+Będziemy je nazywać wierzchołkami typu \(SP\). Dzieciami wierzchołka typu \(SP\)
+są sekwenty-przesłanki występujące w danym rozbiciu.
+
+Struktura drzewa jest więc naprzemienna:
+\[
+\small
+\begin{array}{c}
+\text{sekwent}\\[-0.2ex]
+LP
+\end{array}
+\;\longrightarrow\;
+\begin{array}{c}
+\text{rozbicie}\\[-0.2ex]
+SP
+\end{array}
+\;\longrightarrow\;
+\begin{array}{c}
+\text{podsekwenty}\\[-0.2ex]
+LP_1,\ldots,LP_n
+\end{array}.
+\]
+
+Wierzchołek typu \(LP\) jest rozwiązany, jeżeli udało się bezpośrednio wygenerować
+dowód odpowiadającego mu sekwentu albo jeżeli przynajmniej jedno z jego rozbić
+prowadzi do rozwiązanych podproblemów. Wierzchołek typu \(SP\) jest rozwiązany,
+jeżeli rozwiązane są wszystkie podproblemy występujące w danym rozbiciu.
+
+\subsection{Wartość wierzchołka}
+
+Każdemu wierzchołkowi drzewa przypisywana jest wartość logiczna informująca, czy
+problem zakodowany w tym wierzchołku został już rozwiązany. Wartość ta jest
+obliczana inaczej dla obu typów wierzchołków.
+
+Dla wierzchołka typu \(LP\), który reprezentuje pojedynczy sekwent, wystarczy znaleźć
+jeden sposób jego udowodnienia. Może to być dowód wygenerowany bezpośrednio albo
+jedno z poprawnych rozbić, którego wszystkie podproblemy zostały rozwiązane.
+Dlatego wartość wewnętrznego wierzchołka typu \(LP\) jest alternatywą wartości jego
+dzieci:
+\[
+    Value(LP) = \bigvee_{C \in Children(LP)} Value(C).
+\]
+
+Dla wierzchołka typu \(SP\), który reprezentuje konkretne rozbicie, sytuacja jest
+inna. Rozbicie jest użyteczne dopiero wtedy, gdy uda się rozwiązać wszystkie jego
+podproblemy. Dlatego wartość wewnętrznego wierzchołka typu \(SP\) jest koniunkcją
+wartości jego dzieci:
+\[
+    Value(SP) = \bigwedge_{C \in Children(SP)} Value(C).
+\]
+
+Takie wartościowanie odpowiada naturalnej interpretacji drzewa poszukiwania.
+Wierzchołek problemu wymaga znalezienia przynajmniej jednej skutecznej metody
+dowodu. Wierzchołek rozbicia wymaga natomiast rozwiązania wszystkich problemów,
+na które dany problem został rozłożony.
+
+\subsection{Rozwijanie liścia}
+
+Liść typu \(LP\) reprezentuje sekwent, dla którego system nie zna jeszcze ani
+bezpośredniego dowodu, ani żadnego rozbicia na podproblemy. Rozwinięcie takiego
+liścia polega na podjęciu dwóch kolejnych prób.
+
+Najpierw system próbuje znaleźć bezpośredni dowód sekwentu za pomocą wcześniejszej
+strategii przeszukiwania wielu częściowych dowodów. Jeżeli taka próba zakończy się
+sukcesem, wierzchołek zostaje oznaczony jako rozwiązany. Nie ma wtedy potrzeby
+rozbijania go na podproblemy.
+
+Jeżeli bezpośredniego dowodu nie uda się znaleźć w przyjętych limitach, system
+próbuje wygenerować jedno lub kilka rozbić tego sekwentu. Poprawne rozbicia są
+dodawane jako dzieci rozwijanego wierzchołka, a do każdego z nich dodawane są
+następnie dzieci odpowiadające podproblemom danego rozbicia.
+
+Schemat rozwijania liścia można zapisać tak:
+\[
+\begin{array}{l}
+\textsc{RozwińLiść}(LP):\\[0.4ex]
+\quad \text{spróbuj znaleźć bezpośredni dowód sekwentu } LP,\\
+\quad \text{jeżeli dowód został znaleziony, oznacz } LP \text{ jako rozwiązany,}\\
+\quad \text{w przeciwnym przypadku wygeneruj poprawne rozbicia } LP,\\
+\quad \text{dodaj każde rozbicie jako dziecko typu } SP,\\
+\quad \text{dla każdego rozbicia dodaj jego podproblemy jako dzieci typu } LP,\\
+\quad \text{zaktualizuj wartości logiczne odpowiednich wierzchołków.}
+\end{array}
+\]
+
+W ten sposób system łączy dwa tryby działania. Dopóki możliwe jest znalezienie
+dowodu bezpośrednio, korzysta z generowania liniowego. Dopiero gdy to się nie uda,
+przechodzi do bardziej strukturalnego kroku, czyli dekompozycji celu.
+
+\subsection{Rekurencyjne przeszukiwanie drzewa}
+
+Ostateczna strategia polega na rekurencyjnym przeszukiwaniu opisanego drzewa.
+Jeżeli aktualny wierzchołek jest już oznaczony jako rozwiązany, procedura kończy się
+sukcesem. Jeżeli jest nierozwiązanym liściem typu \(LP\), system próbuje go rozwinąć.
+Jeżeli jest wewnętrznym wierzchołkiem typu \(LP\), wystarczy znaleźć rozwiązanie dla
+jednego z jego dzieci. Jeżeli natomiast jest wierzchołkiem typu \(SP\), trzeba znaleźć
+rozwiązania dla wszystkich jego dzieci.
+
+Pseudokod można zapisać następująco:
+\[
+\begin{array}{l}
+\textsc{Przeszukaj}(v):\\[0.4ex]
+\quad \textbf{jeżeli } Value(v)=True:\\
+\qquad \textbf{zwróć } True,\\[0.4ex]
+
+\quad \textbf{jeżeli } v \text{ jest liściem typu } LP:\\
+\qquad \textsc{RozwińLiść}(v),\\
+\qquad \textbf{zwróć } Value(v),\\[0.4ex]
+
+\quad \textbf{jeżeli } v \text{ jest wewnętrznym wierzchołkiem typu } LP:\\
+\qquad \text{wybierz jedno z jego dzieci typu } SP,\\
+\qquad \textbf{jeżeli } \textsc{Przeszukaj}(SP)=True:\\
+\qquad\qquad \text{zaktualizuj wartość } v,\\
+\qquad \textbf{zwróć } Value(v),\\[0.4ex]
+
+\quad \textbf{jeżeli } v \text{ jest wierzchołkiem typu } SP:\\
+\qquad \textbf{dla każdego dziecka } u \text{ wierzchołka } v:\\
+\qquad\qquad \textbf{jeżeli } \textsc{Przeszukaj}(u)=False:\\
+\qquad\qquad\qquad \textbf{zwróć } False,\\
+\qquad \text{zaktualizuj wartość } v,\\
+\qquad \textbf{zwróć } True.
+\end{array}
+\]
+
+Ta procedura odzwierciedla różnicę między dwoma typami wierzchołków. W przypadku
+wierzchołka typu \(LP\) wystarczy znaleźć jedną skuteczną drogę dowodu, dlatego
+wybór między rozbiciami ma charakter alternatywny. W przypadku wierzchołka typu
+\(SP\) dane rozbicie narzuca listę podproblemów, z których każdy musi zostać
+udowodniony, dlatego przeszukiwanie ma charakter koniunkcyjny.
+
+Strategia trzecia jest więc połączeniem wcześniejszych metod z planowaniem
+struktury dowodu. Model językowy jest używany zarówno do generowania dowodów
+sekwentów, jak i do proponowania rozbić celów na podproblemy, natomiast formalny
+weryfikator sprawdza poprawność wszystkich wygenerowanych kroków. Dzięki temu
+system może wykorzystywać elastyczność modelu językowego, ale nie rezygnuje
+z formalnej kontroli poprawności.
+
+
+\subsection{Sklejanie dowodów}
+
+Opisane wcześniej drzewo poszukiwania pozwala stwierdzić, czy dany problem został
+rozwiązany, ale sama wartość logiczna wierzchołka nie jest jeszcze końcowym dowodem
+w notacji tekstowej. Jeżeli problem został rozwiązany przez bezpośrednie wygenerowanie
+dowodu, sytuacja jest prosta: wystarczy zwrócić znaleziony dowód. Jeżeli jednak
+problem został rozwiązany przez rozbicie na podproblemy, trzeba jeszcze połączyć
+dowody tych podproblemów w jeden dowód problemu wyjściowego.
+
+Operacja ta odpowiada odwróceniu procesu rozbijania. Wierzchołek typu \(SP\)
+przechowuje regułę wnioskowania oraz listę podproblemów. Jeżeli dla każdego
+z tych podproblemów znaleziono dowód, to można najpierw umieścić te dowody jeden
+po drugim, a następnie dopisać na końcu linię, która stosuje regułę zapisaną
+w rozbiciu do ostatnich linii odpowiednich poddowodów. W ten sposób z dowodów
+przesłanek otrzymujemy dowód konkluzji.
+
+Najprostszy przypadek zachodzi wtedy, gdy reguła użyta w rozbiciu nie wymaga
+dodatkowych założeń lokalnych. Wtedy procedura sklejania wykonuje trzy kroki:
+\[
+\begin{array}{l}
+\textsc{SklejDowody}(D_1,\ldots,D_n,R,S):\\[0.4ex]
+\quad \text{przenumeruj linie dowodów } D_1,\ldots,D_n,\\
+\quad \text{połącz je w jeden ciąg linii,}\\
+\quad \text{dopisz linię stosującą regułę } R
+      \text{ do końcowych linii poddowodów,}\\
+\quad \text{sprawdź parserem poprawność otrzymanego dowodu,}\\
+\quad \text{zwróć połączony dowód.}
+\end{array}
+\]
+
+Przenumerowanie linii jest konieczne, ponieważ każdy poddowód jest generowany jako
+osobny fragment zaczynający się od linii numer \(1\). Po połączeniu kilku takich
+fragmentów odwołania do wcześniejszych linii muszą zostać przesunięte o liczbę linii
+występujących w poprzednich poddowodach. Bez tego dwa różne poddowody mogłyby
+zawierać linie o tych samych numerach, a odwołania w regułach wskazywałyby
+nieprawidłowe miejsca.
+
+Dodatkowym problemem jest obecność kontekstu bazowego w dowodach podproblemów.
+Poddowód sekwentu z założeniami może być zapisany w formie, w której założenia
+te występują w nagłówku promptu jako kontekst bazowy. Przy sklejaniu kilku
+poddowodów wygodniej jest jednak mieć jeden zwykły ciąg linii dowodu, bez osobnych
+nagłówków dla każdego fragmentu. Dlatego przed połączeniem poddowodów kontekst
+bazowy zostaje usunięty z nagłówka i wprowadzony jawnie jako początkowe linie
+dowodu. Założenia z kontekstu są więc zamieniane na zwykłe linie, do których można
+się później odwoływać.
+
+Schematycznie można to przedstawić następująco:
+\[
+\small
+\begin{array}{c}
+\text{dowody}\\[-0.2ex]
+\text{podproblemów}
+\end{array}
+\;\longrightarrow\;
+\begin{array}{c}
+\text{usunięcie}\\[-0.2ex]
+\text{kontekstów bazowych}
+\end{array}
+\;\longrightarrow\;
+\begin{array}{c}
+\text{przenumerowanie}\\[-0.2ex]
+\text{linii}
+\end{array}
+\;\longrightarrow\;
+\begin{array}{c}
+\text{dopisana}\\[-0.2ex]
+\text{reguła sklejająca}
+\end{array}
+\;\longrightarrow\;
+\begin{array}{c}
+\text{pełny}\\[-0.2ex]
+\text{dowód}
+\end{array}.
+\]
+
+Niektóre reguły wymagają przy sklejaniu dodatkowej ostrożności. Dotyczy to przede
+wszystkim reguł, które usuwają pewne założenie z kontekstu, takich jak wprowadzenie
+implikacji, wprowadzenie negacji oraz \(RAA\). W takich przypadkach sama końcowa
+linia poddowodu nie wystarcza, ponieważ reguła musi odwołać się również do linii
+wprowadzającej odpowiednie założenie lokalne. Dlatego procedura sklejania wprowadza
+najpierw dodatkową linię odpowiadającą temu założeniu, a dopiero potem dopisuje
+linię stosującą właściwą regułę.
+
+Przykładowo, przy sklejaniu dowodu dla implikacji \(\varphi \to \psi\) poddowód
+prowadzi do \(\psi\) w kontekście rozszerzonym o \(\varphi\). Aby otrzymać końcową
+linię z \(\varphi \to \psi\), system musi wskazać zarówno linię, w której założono
+\(\varphi\), jak i linię, w której uzyskano \(\psi\). Analogiczna sytuacja zachodzi przy
+wprowadzaniu negacji, gdzie lokalne założenie \(\varphi\) prowadzi do sprzeczności,
+oraz przy \(RAA\), gdzie lokalne założenie \(\neg\varphi\) prowadzi do sprzeczności.
+
+Ostateczna procedura odtwarzania dowodu z drzewa działa rekurencyjnie. Jeżeli
+wierzchołek typu \(LP\) jest rozwiązanym liściem, zwracany jest jego bezpośredni
+dowód po sprowadzeniu kontekstu bazowego do zwykłych linii dowodu. Jeżeli
+wierzchołek typu \(LP\) został rozwiązany przez jedno ze swoich dzieci, procedura
+przechodzi do tego dziecka. Jeżeli natomiast wierzchołek jest typu \(SP\), najpierw
+rekurencyjnie odtwarzane są dowody wszystkich jego dzieci, a następnie są one
+sklejane przy użyciu reguły zapisanej w tym rozbiciu.
+
+Można to zapisać następująco:
+\[
+\begin{array}{l}
+\textsc{OdtwórzDowód}(v):\\[0.4ex]
+\quad \textbf{jeżeli } Value(v)=False:\\
+\qquad \text{zgłoś błąd,}\\[0.4ex]
+
+\quad \textbf{jeżeli } v \text{ jest rozwiązanym liściem typu } LP:\\
+\qquad \textbf{zwróć } \text{dowód zapisany w } v,\\[0.4ex]
+
+\quad \textbf{jeżeli } v \text{ jest wewnętrznym wierzchołkiem typu } LP:\\
+\qquad \text{wybierz dziecko } u \text{ takie, że } Value(u)=True,\\
+\qquad \textbf{zwróć } \textsc{OdtwórzDowód}(u),\\[0.4ex]
+
+\quad \textbf{jeżeli } v \text{ jest wierzchołkiem typu } SP:\\
+\qquad \text{dla każdego dziecka } u_i \text{ oblicz } D_i=\textsc{OdtwórzDowód}(u_i),\\
+\qquad \textbf{zwróć } \textsc{SklejDowody}(D_1,\ldots,D_n,R,S).
+\end{array}
+\]
+
+Po sklejeniu dowód jest ponownie przekazywany parserowi. Dzięki temu nawet jeżeli
+błąd pojawi się dopiero na etapie przesuwania indeksów, usuwania kontekstów
+bazowych albo dopisywania końcowej reguły, zostanie wykryty przed zwróceniem
+wyniku. Ostatecznie system zwraca więc nie tylko informację, że drzewo poszukiwania
+zawiera rozwiązanie, lecz także jeden konkretny dowód w tej samej notacji tekstowej,
+która była używana podczas trenowania modelu i sprawdzania częściowych dowodów.
 \section{Strategia trzecia: dekompozycja celu i drzewo poszukiwania}
 \subsection{Motywacja}
 \subsection{Rozbicie problemu na podproblemy}
@@ -1477,6 +2013,15 @@ z nich osobno.
 \subsection{Wartość wierzchołka}
 \subsection{Rozwijanie liścia}
 \subsection{Rekurencyjne przeszukiwanie drzewa}
+
+
+
+
+
+
+
+
+
 
 \section{Podsumowanie strategii}
 
