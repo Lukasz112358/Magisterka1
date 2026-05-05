@@ -14,7 +14,22 @@
 \usepackage{bussproofs}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage{listings}
 \usepackage{float}
+\lstset{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  keepspaces=true,
+  literate=
+    {∧}{{$\wedge$}}1
+    {∨}{{$\vee$}}1
+    {¬}{{$\neg$}}1
+    {→}{{$\to$}}1
+    {↔}{{$\leftrightarrow$}}1
+    {⊤}{{$\top$}}1
+    {⊥}{{$\bot$}}1
+    {⊢}{{$\vdash$}}1
+}
 \theoremstyle{definition}
 \newtheorem{definition}{Definicja}
 
@@ -1523,18 +1538,18 @@ próba udowodnienia osobno jej dwóch składników. Jeżeli celem jest udowodnie
 implikacji, można przyjąć jej poprzednik jako dodatkowe założenie i następnie
 spróbować udowodnić jej następnik. W obu przypadkach nie zaczynamy od pytania
 o pierwszą linię dowodu, lecz od pytania o to, jakie podproblemy prowadzą do
-rozwiązania problemu wyjściowego.
+rozwiązania problemu wejściowego.
 
 Trzecia strategia rozszerza więc wcześniejsze podejścia o możliwość dekompozycji
 celu. System może najpierw rozbić dowodzony sekwent na listę prostszych
 podproblemów, a dopiero potem próbować udowodnić każdy z nich za pomocą
 wcześniejszych metod generowania dowodów. Jeżeli wszystkie podproblemy danego
-rozbicia zostaną rozwiązane, to rozwiązany zostaje również problem wyjściowy.
+rozbicia zostaną rozwiązane, to rozwiązany zostaje również problem wejściowy.
 
 \subsection{Rozbicie problemu na podproblemy}
 
 Rozbiciem problemu na podproblemy nazywamy wskazanie takiej reguły
-wnioskowania oraz takiej listy sekwentów-przesłanek, że sekwent wyjściowy
+wnioskowania oraz takiej listy sekwentów-przesłanek, że sekwent wejściowy
 można otrzymać przez zastosowanie tej reguły do tych przesłanek.
 
 Aby zapisać to precyzyjniej, dla każdej reguły \(R\) oraz listy sekwentów
@@ -1600,7 +1615,7 @@ zadanie generatywne. W przypadku dowodzenia liniowego model otrzymuje zapis celu
 oraz dotychczasowy fragment dowodu i ma zaproponować jego dalszy ciąg. W przypadku
 rozbijania problemu model otrzymuje sekwent, który chcemy udowodnić, i ma wskazać
 regułę wnioskowania oraz listę podproblemów, których udowodnienie pozwoli otrzymać
-sekwent wyjściowy.
+sekwent wejściowy.
 
 Z tego powodu w systemie wykorzystywane są dwa modele językowe o tej samej
 architekturze transformera, ale trenowane na różnych typach danych. Pierwszy model
@@ -1631,7 +1646,7 @@ gdzie \(S\) jest sekwentem, który chcemy rozbić, \(R\) jest nazwą reguły
 wnioskowania, a \(S_1,\ldots,S_n\) są sekwentami-przesłankami otrzymanymi po
 rozbiciu.
 
-Pierwsza linia określa problem wyjściowy. Druga linia wskazuje regułę, za pomocą
+Pierwsza linia określa problem wejściowy. Druga linia wskazuje regułę, za pomocą
 której problem ma zostać rozbity. Kolejne linie zawierają listę podproblemów. Jeżeli
 reguła nie wymaga żadnych przesłanek (np reguła \texttt{Assumption}), lista podproblemów jest pusta. 
 
@@ -1652,11 +1667,11 @@ udowodnienia jej prawej strony przy dodatkowym założeniu jej lewej strony.
 \subsection{Sprawdzanie poprawności rozbicia}
 
 Ponieważ rozbicia są generowane przez model językowy, każde wygenerowane rozbicie
-musi zostać sprawdzone formalnie. Rozbicie składa się z problemu wyjściowego \(S\),
+musi zostać sprawdzone formalnie. Rozbicie składa się z problemu wejściowego \(S\),
 reguły \(R\) oraz listy podproblemów \(S_1,\ldots,S_n\). Jest poprawne wtedy, gdy
-zastosowanie reguły \(R\) do podproblemów pozwala otrzymać problem wyjściowy.
+zastosowanie reguły \(R\) do podproblemów pozwala otrzymać problem wejściowy.
 
-W implementacji reguły wnioskowania mogą być stosowane tylko do sekwentów,
+W naszej implementacji reguły wnioskowania mogą być stosowane tylko do sekwentów,
 które mają ten sam kontekst bazowy. Dlatego przed sprawdzeniem rozbicia wszystkie
 podproblemy sprowadzane są do postaci z pustym kontekstem bazowym. Cały ich
 kontekst logiczny zostaje przeniesiony do kontekstu dodatkowego. Jeżeli podproblem
@@ -1665,71 +1680,384 @@ to zastępujemy go sekwentem
 \[
     \emptyset ; \Gamma_b,\Gamma_d \vdash \varphi.
 \]
-Średnik oddziela tutaj kontekst bazowy od kontekstu dodatkowego.
+Gdzie średnik oddziela tutaj kontekst bazowy od kontekstu dodatkowego.
 
-Tak samo przekształcany jest problem wyjściowy \(S\). Nie jest to potrzebne do
+Tak samo przekształcany jest problem wejściowy \(S\). Nie jest to potrzebne do
 samego zastosowania reguły, ale upraszcza końcowe porównanie: wynik zastosowania
-reguły do przekształconych podproblemów porównujemy z problemem wyjściowym
+reguły do przekształconych podproblemów porównujemy z problemem wejściowym
 zapisanym w tej samej konwencji.
 
 Procedura sprawdzania wygląda więc następująco:
-\[
-\begin{array}{l}
-\textsc{SprawdźRozbicie}(S,R,S_1,\ldots,S_n):\\[0.4ex]
-\quad \text{sprowadź } S \text{ do postaci z pustym kontekstem bazowym,}\\
-\quad \text{sprowadź każde } S_i \text{ do postaci z pustym kontekstem bazowym,}\\
-\quad \text{sprawdź pomocniczo, czy każde } S_i \text{ jest sekwentem tautologicznym,}\\
-\quad \text{wyznacz dodatkowe argumenty potrzebne regule } R,\\
-\quad \text{spróbuj zastosować } R \text{ do przekształconych podproblemów,}\\
-\quad \text{jeżeli zastosowanie reguły zgłasza błąd, odrzuć rozbicie,}\\
-\quad \text{jeżeli otrzymany sekwent jest różny od przekształconego } S,
-      \text{ odrzuć rozbicie,}\\
-\quad \text{w przeciwnym przypadku zaakceptuj rozbicie.}
-\end{array}
-\]
 
-Dodatkowe argumenty są potrzebne dla tych reguł, których zastosowanie nie jest
-jednoznacznie wyznaczone przez same przesłanki. Na przykład przy regule
-\(\vee I_1\) trzeba wskazać prawy składnik alternatywy, a przy \(RAA\) formułę,
-której dowodzimy przez sprowadzenie jej negacji do sprzeczności. W takich przypadkach
-brakujące dane są odczytywane z problemu wyjściowego.
 
-Sprawdzanie tautologiczności podproblemów jest elementem pomocniczym. Nie jest
-konieczne do stwierdzenia, czy rozbicie pasuje do schematu reguły, ale pozwala
-odrzucić rozbicia prowadzące do podproblemów, których system i tak nie byłby
-w stanie udowodnić. Jest to uproszczenie przyjęte ze względu na prototypowy
-i eksperymentalny charakter systemu oraz niewielki rozmiar rozważanych formuł.
-Nie zastępuje ono generowania dowodu: zaakceptowany podproblem nadal musi mieć
-formalny dowód, którego kolejne linie są sprawdzane przez parser i reguły
-wnioskowania.
+\begin{algorithm}[H]
+\caption{Sprawdzanie poprawności rozbicia}
+\begin{algorithmic}[1]
+\Procedure{SprawdźRozbicie}{$S, R, S_1,\ldots,S_n$}
+    \State \(S' \gets\) sekwent \(S\) sprowadzony do postaci z pustym kontekstem bazowym
+    \For{\(i = 1,\ldots,n\)}
+        \State \(S_i' \gets\) sekwent \(S_i\) sprowadzony do postaci z pustym kontekstem bazowym
+        \If{\(S_i\) nie jest sekwentem tautologicznym}
+            \State \Return odrzuć rozbicie
+        \EndIf
+    \EndFor
+    \State \(A \gets\) dodatkowe argumenty potrzebne do zastosowania reguły \(R\)
+    \State spróbuj zastosować \(R\) do \(S_1',\ldots,S_n'\) z argumentami \(A\)
+    \If{zastosowanie reguły zgłasza błąd}
+        \State \Return odrzuć rozbicie
+    \EndIf
+    \State \(T \gets\) wynik zastosowania reguły \(R\)
+    \If{\(T \neq S'\)}
+        \State \Return odrzuć rozbicie
+    \EndIf
+    \State \Return zaakceptuj rozbicie
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+
+
+Dodatkowe argumenty podobnie jak przy przetważaniu dowodów liniowych są potrzebne dla tych reguł, których zastosowanie  nie jest
+jednoznacznie wyznaczone przez same przesłanki.  W takich przypadkach
+brakujące dane są dedukowane z problemu wejściowego lub z problemu wejściowego i przesłanek.
+
+Sprawdzanie tautologiczności podproblemów pełni w systemie rolę pomocniczego
+filtra. Nie jest ono potrzebne do samego sprawdzenia, czy dane rozbicie odpowiada
+schematowi wybranej reguły wnioskowania. Pozwala jednak od razu odrzucić takie
+rozbicia, które prowadzą do podproblemów niedowodliwych, a więc do gałęzi drzewa
+poszukiwania, które nie mogłyby zostać domknięte.
+
+Rozwiązanie to jest mało eleganckie z punktu widzenia czysto dowodowego, ponieważ
+system sprawdza semantycznie, czy sekwent, dla którego następnie ma znaleźć dowód,
+jest tautologiczny. W niniejszej pracy jest to jednak świadome uproszczenie
+implementacyjne. System ma charakter prototypowy i eksperymentalny, a rozważane
+formuły są na tyle małe, że sprawdzenie wszystkich wartościowań nie stanowi
+istotnego kosztu obliczeniowego. Dzięki temu można ograniczyć liczbę oczywiście
+bezowocnych prób i skupić się na właściwym celu pracy, czyli generowaniu formalnych
+dowodów przez model językowy.
+
+Należy podkreślić, że filtr tautologiczności nie zastępuje dowodu. Zaakceptowany
+podproblem nadal musi zostać udowodniony w przyjętej notacji, a każda linia
+wygenerowanego dowodu jest następnie sprawdzana przez parser i implementację
+reguł wnioskowania. Sprawdzenie tautologiczności pełni więc jedynie funkcję
+praktycznego ograniczenia przestrzeni poszukiwań, a nie mechanizmu konstruowania
+dowodu.
+
 
 \subsection{Generowanie rozbić przez model}
 
-Rozbicia są generowane przez model językowy w podobny sposób jak kolejne linie
-dowodu. Model otrzymuje początek tekstu zawierający linię \texttt{Smash:} z opisem
-sekwentu, który ma zostać rozbity, a następnie próbuje dopisać dalszą część opisu:
-wybraną regułę oraz listę podproblemów. Wygenerowany kandydat jest następnie
-sprawdzany przez procedurę weryfikującą rozbicie.
-
-Schemat generowania pojedynczego poprawnego rozbicia wygląda następująco:
+Generowanie rozbicia przebiega analogicznie do generowania kolejnych linii dowodu:
+model językowy nie tworzy od razu struktury logicznej, lecz dopisuje tekst w ustalonym
+formacie. Punktem wyjścia jest prompt zawierający sekwent, który ma zostać rozbity:
 \[
-\begin{array}{l}
-\textsc{WygenerujRozbicie}(S):\\[0.4ex]
-\quad \text{utwórz prompt zaczynający się od } \texttt{Smash: } S,\\
-\quad \text{wygeneruj dalsze linie opisu rozbicia,}\\
-\quad \text{sprawdź, czy tekst ma pełny format rozbicia,}\\
-\quad \text{sprawdź formalną poprawność rozbicia,}\\
-\quad \text{jeżeli rozbicie jest poprawne, zwróć je,}\\
-\quad \text{w przeciwnym przypadku ponów próbę generacji.}
-\end{array}
+\texttt{Smash: } S
+\]
+Na podstawie tego promptu model najpierw generuje linię wskazującą regułę
+wnioskowania, czyli linię zaczynającą się od \texttt{With:}. Następnie generowana jest
+linia \texttt{To:}, zawierająca listę podproblemów, na które ma zostać rozbity sekwent
+wejściowy.
+
+Podczas generowania podproblemów stosowane jest proste ograniczenie składniowe:
+model może dopisywać jedynie symbole logiczne, separatory oraz zmienne występujące
+w rozbijanym sekwencie. Dzięki temu zmniejsza się liczba kandydatów, które już na
+poziomie zapisu wprowadzają zupełnie nowe zmienne i z tego powodu nie mogą być
+sensownymi rozbiciami danego problemu. Nie jest to jednak pełna kontrola poprawności.
+Wygenerowany tekst nadal musi zostać sparsowany i sprawdzony przez procedurę
+weryfikującą rozbicie.
+
+Model może też wygenerować listę podproblemów w kilku liniach. Przyjmujemy, że opis
+rozbicia jest gotowy do sprawdzenia wtedy, gdy ma już co najmniej trzy linie oraz
+ostatnia linia nie kończy się przecinkiem. Przecinek na końcu oznacza, że model
+sugeruje dalszy ciąg listy podproblemów, więc generowanie powinno być kontynuowane.
+
+Schemat działania można zapisać następująco:
+
+\begin{algorithm}[H]
+\caption{Generowanie rozbicia}
+\begin{algorithmic}[1]
+\Procedure{WygenerujRozbicie}{$S, N$}
+    \State \(p_0 \gets \texttt{Smash: } S\)
+    \State \(p \gets p_0\)
+    \For{\(i = 1,\ldots,N\)}
+        \While{\(p\) nie jest gotowe do sprawdzenia}
+            \State wygeneruj następną linię tekstu na podstawie \(p\)
+            \State dopisz wygenerowaną linię do \(p\)
+        \EndWhile
+
+        \If{\(p\) koduje poprawne rozbicie}
+            \State \Return \(p\)
+        \Else
+            \State \(p \gets p_0\)
+        \EndIf
+    \EndFor
+    \State \Return informacja o niepowodzeniu
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+Jeżeli wygenerowany tekst nie przechodzi weryfikacji, zostaje odrzucony w całości
+poza pierwszą linią \(\texttt{Smash:} S\), która określa sekwent do rozbicia. System nie
+próbuje naprawiać błędnego kandydata lokalnie, ponieważ błąd może wynikać zarówno
+z wyboru niewłaściwej reguły, jak i z niepoprawnej listy podproblemów albo z samego
+formatu tekstowego. W takiej sytuacji prostsze i bardziej stabilne jest ponowienie
+generacji od tego samego punktu początkowego. Procedura powtarza ten proces do
+momentu znalezienia poprawnego rozbicia albo osiągnięcia ustalonego limitu prób.
+
+
+
+\subsection{Dowodzenie sekwentów z założeniami}
+
+Dotychczas najprostsza wersja systemu mogła być rozumiana jako narzędzie do
+dowodzenia tautologii, czyli sekwentów o pustym kontekście. Wprowadzenie rozbić
+problemów na podproblemy zmienia jednak tę sytuację. Nawet jeśli problem wyjściowy
+ma postać
+\[
+    \vdash \varphi,
+\]
+to jego podproblemy mogą mieć już niepuste konteksty. Przykładowo rozbicie celu
+\[
+    \vdash \varphi \to \psi
+\]
+przez regułę wprowadzania implikacji prowadzi do podproblemu
+\[
+    \varphi \vdash \psi.
+\]
+Oznacza to, że system musi umieć nie tylko dowodzić tautologii, lecz także generować
+dowody sekwentów z założeniami.
+
+
+Przy dowodzeniu sekwentów z założeniami pojawia się dodatkowa trudność:
+należy kontrolować, które formuły należą do kontekstu sekwentu kodowanego przez
+daną linię dowodu. Naturalnym uproszczeniem jest przyjęcie, że założenia sekwentu
+wejściowego są dostępne przez cały czas trwania dowodu, a więc znajdują się
+w kontekście każdej generowanej linii. 
+
+To uproszczenie prowadzi do podziału kontekstu na dwie części. Kontekst bazowy,
+oznaczany w implementacji jako \texttt{base\_context}, zawiera formuły traktowane
+jako stale dostępne w całym rozważanym dowodzie. Są to założenia
+dowodzonego sekwentu, zapisane w nagłówku promptu. Jako \texttt{additional\_context} z kolei oznaczamy kontekst dodatkowy, który zawiera natomiast założenia lokalne,
+które mogą zmieniać się pomiędzy liniami dowodu. 
+
+Reguły wnioskowania stosujemy wyłącznie do przesłanek mających ten sam kontekst
+bazowy oraz wynik działania reguły ma również ten sam kontekst bazowy co przesłanki. 
+
+Działanie reguł wnioskowania dla przesłanek z kontekstem podzielonym na kontekst bazowy i dodatkowy 
+można rozumieć jako zastosowanie tych reguł w klasyczny sposób, czyli
+bez rozróżnienia na kontekst bazowy i dodatkowy, a następnie uzupełnieniu kontekstu konkluzji
+brakującymi formułami należącymi do kontekstu bazowego. 
+
+Można więc powiedzieć, że schemat działania reguły \(R\) dla sekwentów z rozróżnionym kontekstem bazowym i dodatkowym polega na zastąpieniu schematu
+
+\[
+\frac{
+    \Gamma_1 \vdash \varphi_1
+    \qquad
+    \Gamma_2 \vdash \varphi_2
+    \qquad
+    \cdots
+    \qquad
+    \Gamma_n \vdash \varphi_n
+}{
+    \Delta \vdash \psi
+}\;(R)
 \]
 
-W praktyce dla jednego problemu można wygenerować kilka rozbić. Część z nich może
-się powtarzać, ponieważ model często wskazuje te same najbardziej naturalne reguły.
-Powtórzenia nie są całkowicie bezużyteczne: można je traktować jako informację
-o tym, które rozbicia model wybiera najchętniej. Dlatego częstości występowania
-poszczególnych rozbić mogą zostać użyte jako wagi przy późniejszym wyborze gałęzi
-drzewa poszukiwania.
+schematem:
+
+\[
+\frac{
+    \Gamma ; \Gamma_1 \setminus \Gamma \vdash \varphi_1
+    \qquad
+    \Gamma ; \Gamma_2 \setminus \Gamma \vdash \varphi_2
+    \qquad
+    \cdots
+    \qquad
+    \Gamma ; \Gamma_n \setminus \Gamma\vdash \varphi_n
+}{
+    \Gamma ; \Delta \setminus \Gamma \vdash \psi
+}\;(R)
+\]
+
+Zakładamy, że kontekst bazowy i dodatkowy każdego sekwentu są rozłączne.
+
+Taka konwencja wymaga jednak uzasadnienia poprawności. Po pierwsze, trzeba
+pokazać, że jeśli dany sekwent można udowodnić w zwykłej reprezentacji, czyli bez
+wyróżnionego kontekstu bazowego, to można go również udowodnić w reprezentacji,
+w której wszystkie sekwenty pośrednie mają jako kontekst bazowy założenia problemu
+wejściowego. 
+
+Dowód tej zależności jest bardzo prosty, ponieważ ze zdefiniowania działania reguł dla sekwentów z kontekstem bazowym
+wynika wprowst sposób konwersji dowodu z jednej reprezentacji na drugą. Z kolei sekwent w samym korzeniu drzewa dowodu po takiej konwersji ma 
+pusty kontekst dodatkowy (bo \(\Gamma ; \Delta \setminus \Gamma \vdash \psi\) przybiera postać \(\Gamma ; \Gamma \setminus \Gamma \vdash \psi\), czyli \(\Gamma ; \emptyset \vdash \psi\)). 
+
+Po drugie, trzeba pokazać zależność odwrotną: użycie kontekstu bazowego nie może
+pozwalać na udowodnienie sekwentu, którego nie dałoby się uzyskać w zwykłej
+reprezentacji. Jeśli więc istnieje dowód, w którym sekwenty pośrednie korzystają
+z niepustego kontekstu bazowego, to powinien istnieć również odpowiadający mu
+dowód zapisany bez tego technicznego rozróżnienia, czyli taki, w którym przesłanki mają kontekst bazowy pusty.
+
+Dowód tej zależności będzie polegać na pokazaniu algorytmu, który dowód dla sekwentów z kontekstem bazowym równym kontekstowi bazowemu tezy 
+konwertuje na dowód z sekwentami o pustym kontekście bazowym.
+
+Dla uproszczenia rozważań przyjmujemy konwencję jest w której istnieje ukryta linia o indeksie \texttt{0}. Nie jest ona
+wypisywana w tekście dowodu, a numeracja jawnych linii zaczyna się od \texttt{1}.
+Linia \texttt{0} koduje sekwent, którego kontekstem jest przyjęty kontekst bazowy,
+a tezą jest \(\top\). Dzięki temu reguły \texttt{context} oraz \texttt{contextWeak}
+mogą odwoływać się do całego kontekstu bazowego bez konieczności dopisywania
+osobnej linii dowodu której jedyną funkcją jest posiadanie kontekstu równego koqntekstowi bazowemu. 
+Jeżeli kontwekst bazowy jest pusty, linia \texttt{0} koduje sekwent \(\emptyset \vdash \top\).
+
+Idea algorytmu bazuje na następującej obserwacji: jeżeli poprawny jest schemat 
+
+
+\[
+\frac{
+    \Gamma ; \Gamma_1 ' \vdash \varphi_1
+    \qquad
+    \Gamma ; \Gamma_2 '\vdash \varphi_2
+    \qquad
+    \cdots
+    \qquad
+    \Gamma ; \Gamma_n ' \vdash \varphi_n
+}{
+    \Gamma ; \Delta ' \vdash \psi
+}\;(R)
+\]
+
+To z definicji działania reguł dla sekwentów z kontekstem bazowym wynika, że istnieją takie zbiory formuł \(\Gamma_1,\ldots,\Gamma_n\) oraz \(\Delta\), że 
+\(\Gamma_i ' = \Gamma_i \setminus \Gamma\) dla \(i=1,\ldots,n\) oraz \(\Delta ' = \Delta \setminus \Gamma\) oraz schemat
+
+
+\[
+\frac{
+    \Gamma_1  \vdash \varphi_1
+    \qquad
+    \Gamma_2  \vdash \varphi_2
+    \qquad
+    \cdots
+    \qquad
+     \Gamma_n  \vdash \varphi_n
+}{
+    \Delta \vdash \psi
+}\;(R)
+\]
+
+Jednak ze schematu każdej reguły wnioskowania w naszym systemie, która ma niepustą listę przesłanek, 
+wynika, że jeżeli dla przesłanek \(S_1,\ldots,S_n\) można zastosować regułę \(R\) 
+można ją również zastosować do tych samych przesłanek, ale z rozszerzonymi o jakieś formuły kontekstami, a co za tym idzie w rozważanym przypadku
+
+
+\[
+\frac{
+    \Gamma_1 \cup \Gamma \vdash \varphi_1
+    \qquad
+    \Gamma_2 \cup \Gamma \vdash \varphi_2
+    \qquad
+    \cdots
+    \qquad
+    \Gamma_n \cup \Gamma \vdash \varphi_n
+}{
+    \Gamma ' \vdash \psi
+}\;(R)
+\]
+
+dla jakiegoś \(\Gamma'\) zawierającego się w \(\Gamma \cup \Delta\).
+
+
+
+
+Algorytm usuwania kontekstu bazowego działa następująco. Niech
+\[
+    \Gamma = \{\gamma_1,\ldots,\gamma_m\}
+\]
+będzie kontekstem bazowym dowodu wejściowego. Na początku nowego dowodu
+wprowadzamy kolejno wszystkie formuły z \(\Gamma\) jako jawne linie dowodu.
+Robimy to przy użyciu reguły \texttt{contextWeak}. Pierwsza z tych linii odwołuje
+się do ukrytej linii o indeksie \texttt{0}, a każda kolejna do poprzednio uzyskanej linii, dzięki
+czemu po \(m\) krokach otrzymujemy linię, której kontekst dodatkowy jest równy całemu
+dawnemu kontekstowi bazowemu (można to zrobić bo linii o indeksie \texttt{0} używamy tylko w regule \texttt{context} i 
+\texttt{contextWeak}, dla których nie jest istotna konkluzja przesłanki).
+
+Następnie algorytm przechodzi przez kolejne linie oryginalnego dowodu, ale nie
+kopiuje ich dosłownie. Dla każdej starej linii odczytywana jest reguła, która została
+w niej użyta, oraz indeksy wcześniejszych linii, do których ta reguła się odwołuje.
+Ponieważ w nowym dowodzie pojawiają się dodatkowe linie, stare indeksy nie mogą
+zostać użyte bezpośrednio. Algorytm przechowuje więc mapę indeksów, która każdej
+linii starego dowodu przypisuje linię odpowiadającą jej w nowym dowodzie.
+
+Dla rozważanej starej linii algorytm bierze indeksy jej przesłanek, zastępuje je
+indeksami wskazanymi przez tę mapę, a następnie stosuje tę samą regułę do
+odpowiadających im linii nowego dowodu. Otrzymana w ten sposób linia nie jest
+kopią starej linii, lecz jej odpowiednikiem skonstruowanym już w dowodzie bez
+kontekstu bazowego. Jeżeli stara linia odwoływała się do ukrytej linii o indeksie \texttt{0},
+to odwołanie to zostaje zastąpione odwołaniem do linii o indeksie \texttt{m} w nowym dowodzie, czyli do linii, której kontekst dodatkowy
+ jest równy całemu dawnemu kontekstowi bazowemu (można to zrobić bo linii o indeksie \texttt{0} używamy tylko w regule \texttt{context} i 
+\texttt{contextWeak}, dla których nie jest istotna konkluzja przesłanki).
+
+Po skonstruowaniu takiego odpowiednika algorytm sprawdza, czy jego kontekst
+dodatkowy zawiera wszystkie formuły z dawnego kontekstu bazowego. Jeżeli którejś
+z nich brakuje, dodawane są kolejne linie otrzymane przez zastosowanie reguły
+\texttt{weakening}. Dopiero ostatnia linia uzyskana po tych ewentualnych osłabieniach
+jest traktowana jako właściwy odpowiednik danej linii starego dowodu i jej numer
+zostaje zapisany w mapie indeksów.
+
+Dla skrócenia otrzymanego dowodu, jeżeli przetważana stara linia była linią z regułą \texttt{assumption},
+to w nowym dowodzie stosowana jest reguła \texttt{contextWeak} odwołująca się do linii o indeksie \texttt{m}.
+  
+Schematycznie procedurę można zapisać następująco:
+
+\begin{algorithm}[H]
+\caption{Usuwanie kontekstu bazowego}
+\label{alg:remove-base-context}
+\begin{algorithmic}[1]
+\Procedure{UsuńKontekstBazowy}{$D$}
+    \State $\Gamma=\{\gamma_1,\ldots,\gamma_m\} \gets$ kontekst bazowy dowodu $D$
+    \State $D' \gets$ pusty dowód
+    \State $f(0) \gets 0$
+
+    \For{$i = 1,\ldots,m$}
+        \State dopisz do $D'$ linię wyprowadzającą $\gamma_i$ przypomocy \texttt{contextWeak, i-1}
+    \EndFor
+
+    \State $f(0) \gets m$
+
+    \For{każdej jawnej linii $l_i$ dowodu $D$}
+        \State odczytaj z $l_i$ regułę $R$, formułę $\varphi_i$ oraz indeksy $j_1,\ldots,j_n$
+        \State zamień indeksy przesłanek na $f(j_1),\ldots,f(j_n)$
+
+        \If{$R=\texttt{assumption}$}
+            \State dopisz do $D'$ wynik zastosowania \texttt{contextWeak} do linii o indeksie $f(0)$
+        \EndIf
+     
+        \If{$R \neq \texttt{assumption}$}
+            \State dopisz do $D'$ wynik zastosowania $R$ do linii $f(j_1),\ldots,f(j_n)$
+
+        \For{$j \in 1,\ldots,m$}
+            \If{$\gamma_j$ nie należy do kontekstu ostatniej linii $D'$}
+                \State $n \gets$ liczba linii $D'$
+                \State \texttt{l} = \texttt{n+1. }$\phi_i$ \texttt{ weakening j, n}
+                \State dopisz \texttt{l} do $D'$ 
+            \EndIf
+        \EndFor
+        \EndIf
+          
+        
+
+        \State $f(i) \gets$ numer ostatniej linii dowodu $D'$
+    \EndFor
+
+    \State \Return $D'$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+
+
+
+
+
+
+
 
 \subsection{Dwa typy wierzchołków drzewa}
 
@@ -1886,7 +2214,7 @@ rozwiązany, ale sama wartość logiczna wierzchołka nie jest jeszcze końcowym
 w notacji tekstowej. Jeżeli problem został rozwiązany przez bezpośrednie wygenerowanie
 dowodu, sytuacja jest prosta: wystarczy zwrócić znaleziony dowód. Jeżeli jednak
 problem został rozwiązany przez rozbicie na podproblemy, trzeba jeszcze połączyć
-dowody tych podproblemów w jeden dowód problemu wyjściowego.
+dowody tych podproblemów w jeden dowód problemu wejściowego.
 
 Operacja ta odpowiada odwróceniu procesu rozbijania. Wierzchołek typu \(SP\)
 przechowuje regułę wnioskowania oraz listę podproblemów. Jeżeli dla każdego
@@ -2052,7 +2380,7 @@ może okazać się niewystarczające. System może trafiać na ślepe uliczki, p
 na początkowym etapie dowodu nie zawsze wiadomo, która strategia doprowadzi do celu.
 Z tego względu trzecia wersja systemu wprowadza możliwość rozbijania problemu na
 prostsze podproblemy, które następnie mogą zostać połączone odpowiednią regułą
-wnioskowania w rozwiązanie problemu wyjściowego.
+wnioskowania w rozwiązanie problemu wejściowego.
 
 System był rozwijany etapami. Najprostsza wersja zajmuje się wyłącznie generowaniem
 kolejnych linii dowodu i sprawdzaniem ich poprawności. Druga wersja dodaje mechanizm
@@ -2192,6 +2520,20 @@ po którym następuje nazwa reguły której używamy do rozbicia. Trzecia linia 
 rozbicia są zapisywane w kolejnych liniach po przecinku. Jeżeli Lista przesłanek jest pusta prompt kodujący rozbicie kończy się po prostu na \texttt{To: }.  Do sprawdzania czy dany tekst w tym formacie koduje 
 poprawne rozbicie używamy funkcji \texttt{check\_smash\_from\_text}, która najpierw parsuje tekst kodujący rozbicie do obiektu typu \texttt{smashed\_problem}, a następnie sprawdza jego poprawność przy pomocy funjkcji \texttt{is\_smashed\_correctly}.  Jeżeli rozbicie jest niepoprawne, lub podany w argumencie prompt nie jest w odpowiednim formacie \texttt{check\_smash\_from\_text} wyrzuca błąd \texttt{TypeError} z odpowiednią wiadomością. Jeźeli zaś prompt koduje poprawne rozbicie 
 funkcja zwraca zakodowane rozbicie w formie sparsowanej.
+
+\subsection{Dwa typy wierzchołków drzewa}
+
+Aby połączyć dekompozycję celu z generowaniem dowodów częściowych, system buduje
+drzewo poszukiwania. W drzewie tym występują dwa rodzaje wierzchołków.
+
+Pierwszy rodzaj wierzchołków reprezentuje problemy dowodowe, czyli sekwenty do
+udowodnienia. Będziemy je nazywać wierzchołkami typu \(LP\), ponieważ odpowiadają
+obiektom reprezentującym pojedynczy sekwent. Dzieciami takiego wierzchołka są
+możliwe rozbicia danego sekwentu.
+
+Drugi rodzaj wierzchołków reprezentuje konkretne rozbicia problemu na podproblemy.
+Będziemy je nazywać wierzchołkami typu \(SP\). Dzieciami wierzchołka typu \(SP\)
+
 
 Do generowania poprawnych napisów kodujących rozbicie służy funkcja \texttt{silliest\_generate\_smash}. Przyjmuje ona za argumenty zmienną \texttt{bundle} typu \texttt{NanoGPTBundle} odpoowiadający za generację kolejnych tokenów oraz zmienną tekstową \texttt{prompt} kodującą sekwent który chcemy rozbić w omawianym formacie tekstowym. W bloku \texttt{try \dots exept} funkcja ta generuje kolejne linie rozbicia przy pomocy funkcji \texttt{next\_line}, które dopisujemy do zmiennej \texttt{prompt}. Robimy to aż do momentu gdy tak zaktualizowany \texttt{prompt} nie będzie spełniać predykatu \texttt{is\_ready\_to\_check\_smash}, który zwraca prawdę wtedy i tylko wtedy gdy podana jako argument zmienna tekstowa \texttt{prompt}, po uprzednim usunięciu znaków nowej linii z jej końca ma nie mniej niż 3 linie i jej ostatnim znakiem nie jest \texttt{,}. Kiedy ten predykat będzie spełniony sprawdzamy najpierw przy pomocy poprawność rozbicia zakodowanego w \texttt{prompt} przy pomocy \texttt{check\_smash\_from\_text} i jeśli nie jest poprawne wyrzucamy odpowiedni błąd, z kolei jeśli jest poprawne sprawdzamy czy w przesłankach na które rozbiliśmy rozbijany sekwent nie pojawiają się zmienne inne niż w rozbijanym sekwencie. Jeżeli tak się dzieje zwracamy wyrzucamy błęd. Jeśli podczas rozbijania zostanie wyłapany błąd zostawiamy w prompcie tylko pierwszą linię i znak nowej linii, a następnie powtarzamy całą procedurę, aż do momentu kiedy nie wygenerujemy poprawnego rozbicia.
 
