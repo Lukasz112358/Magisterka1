@@ -2055,157 +2055,228 @@ Schematycznie procedurę można zapisać następująco:
 
 
 
+\subsection{Drzewo poszukiwań}
+
+W tej części pracy opisujemy główny algorytm strategii trzeciej, oraz strukturę danych, na której jest ona oparta.
+
+Aby połączyć dekompozycję celu z generowaniem dowodów częściowych, system
+buduje drzewo poszukiwania. Korzeniem tego drzewa jest sekwent, który chcemy
+udowodnić. Następnie system może wygenerować kilka różnych rozbić tego sekwentu
+na podproblemy. Każde takie rozbicie stanowi osobną możliwość kontynuacji
+poszukiwania dowodu. Dzięki temu system nie musi od razu decydować się na jedną
+postać rozumowania, lecz może przechowywać równolegle kilka alternatywnych
+struktur dowodu.
+
+W drzewie występują dwa typy wierzchołków. Pierwszy typ reprezentuje problemy
+dowodowe, czyli sekwenty, które należy udowodnić. Będziemy oznaczać je jako
+wierzchołki typu \texttt{LP}. Drugi typ reprezentuje konkretne rozbicia problemu na
+podproblemy. Będziemy oznaczać je jako wierzchołki typu \texttt{SP}.
+
+Dzieci wierzchołka typu \texttt{LP} są wierzchołkami typu \texttt{SP}, kodującymi
+możliwe rozbicia sekwentu zapisanego w ich rodzicu. Z kolei dzieci wierzchołka typu
+\texttt{SP} są wierzchołkami typu \texttt{LP}, które kodują sekwenty będące
+przesłankami rozbicia zapisanego w ich rodzicu. Struktura drzewa jest więc
+naprzemienna: dziećmi wierzchołków problemów dowodowych są wierzchołki rozbić, 
+a dziećmi wierzchołków rozbić są wierzchołki problemów dowodowych.
+
+Intuicyjnie działanie algorytmu polega na wielokrotnym wybieraniu nierozwiązanych
+fragmentów drzewa i próbie ich dowiedzenia. 
+
+Jeżeli próbujemy udowodnić wierzchołek typu \texttt{LP}, który jest liściem, system najpierw próbuje znaleźć
+jego bezpośredni dowód za pomocą strategii drugiej. Jeśli to się uda, dowód
+zostaje zapisany w wierzchołku, a wartość wierzchołka zmienia się na prawdziwą.
+Jeżeli bezpośredni dowód nie zostanie znaleziony, system generuje możliwe rozbicia
+tego sekwentu i dodaje je jako dzieci wierzchołka. Następnie jako dzieci każdego
+z tych dzieci dodawane są wierzchołki typu \texttt{LP} kodujące przesłanki
+rozbicia zapisanego w ich rodzicu. Jeżeli któryś z wierzchołków rozbicia nie ma
+żadnych przesłanek, zostaje od razu oznaczony jako udowodniony.
+
+Wierzchołek typu \texttt{SP} reprezentuje jedno konkretne rozbicie. Jego dzieciami są
+sekwenty-przesłanki tego rozbicia. Aby udowodnić rozbicie, trzeba udowodnić
+wszystkie te sekwenty. Dlatego dla wierzchołka typu \texttt{SP} algorytm próbuje
+rekurencyjnie dowieść wszystkich jego dzieci. Jeśli choć jedno z nich nie zostanie
+udowodnione w danej próbie, całe rozbicie nie zostaje uznane za udowodnione.
+
+W przypadku wewnętrznego wierzchołka typu \texttt{LP} sytuacja jest inna: wystarczy,
+że powiedzie się próba udowodnienia jednego z jego rozbić. Dlatego algorytm wybiera
+jedno z jego dzieci typu \texttt{SP} i próbuje je udowodnić. Wybór ten odbywa się
+z wagami wprost proporcjonalnymi do częstości, z jaką dane rozbicie zostało
+wygenerowane przez model. Jeżeli wybrane rozbicie zostanie udowodnione, to
+udowodniony zostaje również sekwent reprezentowany przez jego rodzica.
+
+Po każdej udanej próbie dowodu wierzchołka informacja o tym które wierzchołki zostały udowodnione
+jest propagowana w górę drzewa. Jeżeli wierzchołek typu \texttt{SP} zostaje udowodniony, 
+jego rodzic typu \texttt{LP} jest oznaczany jako udowodniony, a informacja o tym jest przekazywana 
+dalej do jego rodzica, aż do korzenia drzewa.
+Jeżeli zaś udowodniony zostaje wierzchołek typu \texttt{LP}, to dla jego rodzica typu \texttt{SP} 
+sprawdzamy, czy wszystkie jego dzieci są już udowodnione. Jeżeli tak, to również ten wierzchołek typu \texttt{SP}
+jest oznaczany jako udowodniony, a informacja o tym jest propagowana dalej dla kolejnych przodków, aż do korzenia.
+
+Opisany mechanizm można wygodnie podzielić na cztery procedury. Pierwsza z nich
+odpowiada za obsługę liścia typu \texttt{LP}, czyli sekwentu, dla którego nie znamy
+jeszcze ani bezpośredniego dowodu, ani rozbicia na podproblemy. Druga procedura
+odpowiada za samo wygenerowanie rozbić takiego liścia i dołączenie ich do drzewa.
+Trzecia procedura opisuje ogólne rekurencyjne przeszukiwanie drzewa, korzystające
+z dwóch poprzednich procedur jako podprogramów. Czwarta procedura zaś uruchamia w pętli 
+procedurę trzecią poszukując dowodu w drzewie po kolejnych aktualizacjach jego struktury.
+
+Najpierw rozważmy obsługę liścia typu \texttt{LP}. Taki wierzchołek reprezentuje
+pojedynczy sekwent, który system próbuje udowodnić. Naturalnie najpierw sprawdzamy,
+czy da się znaleźć jego dowód bez dalszego rozbijania problemu. W tym celu
+uruchamiana jest strategia druga szukania dowodu.
+Jeżeli zakończy się ona sukcesem, znaleziony dowód zostaje zapisany w wierzchołku,
+a sam wierzchołek zostaje oznaczony jako udowodniony. Jeżeli natomiast dowodu
+bezpośredniego nie uda się znaleźć w przyjętych limitach, wierzchołek zostaje
+rozbity na podproblemy.
+
+\begin{algorithm}[H]
+\caption{Obsługa liścia typu \texttt{LP}}
+\label{alg:run-leaf}
+\begin{algorithmic}[1]
+\Procedure{ObsluzLisc}{$X$}
+    \State spróbuj znaleźć bezpośredni dowód sekwentu kodowanego przez $X$
+
+    \If{dowód został znaleziony}
+        \State zapisz znaleziony dowód w $X$
+        \State oznacz $X$ jako udowodniony
+        \State zaktualizuj wartości przodków $X$
+        \State \Return True
+    \Else
+        \State \Call{RozbijLisc}{$X$}
+        \State \Return False
+    \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+Jeżeli nie uda się znaleźć bezpośredniego dowodu sekwentu zapisanego w liściu,
+procedura obsługi liścia deleguje rozbicie tego wierzchołka do kolejnej procedury.
+Procedura rozbijania nie wybiera zwykle pojedynczego rozbicia, lecz wykonuje
+określoną liczbę prób wygenerowania rozbicia przez model. Liczbę tych prób
+oznaczamy przez \(N_{\mathrm{roz}}\). Każde poprawne rozbicie jest zapamiętywane,
+a jeśli to samo rozbicie pojawi się wielokrotnie (co może zdarzać się dość często, bo często jest
+bardzo mało naturalnych rozbić), zwiększana jest jego waga używana w kolejnej procedurze do losowania obsługiwanego wierzchołka. Dzięki
+temu powtarzające się propozycje modelu nie są traktowane jako zbędne duplikaty,
+lecz jako informacja o tym, które rozbicia model uznaje za bardziej naturalne.
+
+Po zakończeniu generowania poprawne rozbicia są dodawane jako dzieci rozważanego
+wierzchołka typu \texttt{LP}. Następnie dla każdego wierzchołka typu \texttt{SP}
+dodawane są jego dzieci typu \texttt{LP}, kodujące sekwenty-przesłanki danego
+rozbicia. Jeżeli dane rozbicie nie ma żadnych przesłanek, odpowiadający mu
+wierzchołek typu \texttt{SP} zostaje od razu oznaczony jako udowodniony.
 
 
+\begin{algorithm}[H]
+\caption{Rozbijanie liścia typu \texttt{LP}}
+\label{alg:smash-leaf}
+\begin{algorithmic}[1]
+\Procedure{RozbijLisc}{$X, N_{\mathrm{roz}}$}
+    \State utwórz prompt opisujący sekwent kodowany przez $X$
+    \State $W \gets$ pusty słownik wag rozbić
+
+    \For{$i = 1,\ldots,N_{\mathrm{roz}}$}
+        \State wygeneruj kandydackie rozbicie $S$
+        \If{$S$ jest poprawnym rozbiciem}
+            \State zwiększ wagę rozbicia $S$ w słowniku $W$
+        \EndIf
+    \EndFor
 
 
-\subsection{Dwa typy wierzchołków drzewa}
+    \For{każde rozbicie $S$ zapisane w $W$}
+        \State dodaj do $X$ dziecko typu \texttt{SP} kodujące rozbicie $S$
+        \State przypisz temu dziecku wagę proporcjonalną do częstości $S$
+    \EndFor
 
-Aby połączyć dekompozycję celu z generowaniem dowodów częściowych, system buduje
-drzewo poszukiwania. W drzewie tym występują dwa rodzaje wierzchołków.
+    \For{każde dziecko $Y$ wierzchołka $X$}
+        \For{każda przesłanka $P$ rozbicia zapisanego w $Y$}
+            \State dodaj do $Y$ dziecko typu \texttt{LP} kodujące sekwent $P$
+        \EndFor
 
-Pierwszy rodzaj wierzchołków reprezentuje problemy dowodowe, czyli sekwenty do
-udowodnienia. Będziemy je nazywać wierzchołkami typu \(LP\), ponieważ odpowiadają
-obiektom reprezentującym pojedynczy sekwent. Dzieciami takiego wierzchołka są
-możliwe rozbicia danego sekwentu.
+        \If{$Y$ nie ma dzieci}
+            \State oznacz $Y$ jako udowodniony
+            \State zaktualizuj wartości przodków $Y$
+        \EndIf
+    \EndFor
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
-Drugi rodzaj wierzchołków reprezentuje konkretne rozbicia problemu na podproblemy.
-Będziemy je nazywać wierzchołkami typu \(SP\). Dzieciami wierzchołka typu \(SP\)
-są sekwenty-przesłanki występujące w danym rozbiciu.
 
-Struktura drzewa jest więc naprzemienna:
-\[
-\small
-\begin{array}{c}
-\text{sekwent}\\[-0.2ex]
-LP
-\end{array}
-\;\longrightarrow\;
-\begin{array}{c}
-\text{rozbicie}\\[-0.2ex]
-SP
-\end{array}
-\;\longrightarrow\;
-\begin{array}{c}
-\text{podsekwenty}\\[-0.2ex]
-LP_1,\ldots,LP_n
-\end{array}.
-\]
+Trzecia procedura opisuje właściwe przeszukiwanie drzewa. Jeżeli aktualny
+wierzchołek jest już oznaczony jako udowodniony, algorytm od razu kończy pracę
+sukcesem. Jeżeli jest liściem typu \texttt{LP}, uruchamiana jest opisana wyżej
+procedura obsługi liścia. Jeżeli jest wewnętrznym wierzchołkiem typu \texttt{LP},
+algorytm wybiera jedno z jego dzieci typu \texttt{SP} zgodnie z wagami rozbić i próbuje
+udowodnić właśnie tę gałąź. Jeżeli natomiast aktualny wierzchołek jest typu
+\texttt{SP}, to algorytm musi udowodnić wszystkie jego dzieci, ponieważ dane rozbicie
+jest skuteczne dopiero wtedy, gdy rozwiązane są wszystkie jego podproblemy.
 
-Wierzchołek typu \(LP\) jest rozwiązany, jeżeli udało się bezpośrednio wygenerować
-dowód odpowiadającego mu sekwentu albo jeżeli przynajmniej jedno z jego rozbić
-prowadzi do rozwiązanych podproblemów. Wierzchołek typu \(SP\) jest rozwiązany,
-jeżeli rozwiązane są wszystkie podproblemy występujące w danym rozbiciu.
+\begin{algorithm}[H]
+\caption{Przeszukiwanie drzewa dowodu}
+\label{alg:try-node}
+\begin{algorithmic}[1]
+\Procedure{Dowiedz}{$X$}
+    \If{$X$ jest już oznaczony jako udowodniony}
+        \State \Return True
+    \EndIf
 
-\subsection{Wartość wierzchołka}
+    \If{$X$ jest liściem typu \texttt{LP}}
+        \State \Return \Call{ObsluzLisc}{$X$}
+    \EndIf
 
-Każdemu wierzchołkowi drzewa przypisywana jest wartość logiczna informująca, czy
-problem zakodowany w tym wierzchołku został już rozwiązany. Wartość ta jest
-obliczana inaczej dla obu typów wierzchołków.
+    \If{$X$ jest wewnętrznym wierzchołkiem typu \texttt{LP}}
+        \State wybierz jedno z dzieci $X$, oznaczmy je przez $Y$
+        \State wybór wykonaj z prawdopodobieństwami zapisanymi w dzieciach $X$
+        \State \Return \Call{Dowiedz}{$Y$}
+    \EndIf
 
-Dla wierzchołka typu \(LP\), który reprezentuje pojedynczy sekwent, wystarczy znaleźć
-jeden sposób jego udowodnienia. Może to być dowód wygenerowany bezpośrednio albo
-jedno z poprawnych rozbić, którego wszystkie podproblemy zostały rozwiązane.
-Dlatego wartość wewnętrznego wierzchołka typu \(LP\) jest alternatywą wartości jego
-dzieci:
-\[
-    Value(LP) = \bigvee_{C \in Children(LP)} Value(C).
-\]
+    \If{$X$ jest wierzchołkiem typu \texttt{SP}}
+        \For{każde dziecko $Y$ wierzchołka $X$}
+            \State $b \gets$ \Call{Dowiedz}{$Y$}
+            \If{$b = False$}
+                \State \Return False
+            \EndIf
+        \EndFor
 
-Dla wierzchołka typu \(SP\), który reprezentuje konkretne rozbicie, sytuacja jest
-inna. Rozbicie jest użyteczne dopiero wtedy, gdy uda się rozwiązać wszystkie jego
-podproblemy. Dlatego wartość wewnętrznego wierzchołka typu \(SP\) jest koniunkcją
-wartości jego dzieci:
-\[
-    Value(SP) = \bigwedge_{C \in Children(SP)} Value(C).
-\]
+        \State oznacz $X$ jako udowodniony
+        \State zaktualizuj wartości przodków $X$
+        \State \Return True
+    \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
-Takie wartościowanie odpowiada naturalnej interpretacji drzewa poszukiwania.
-Wierzchołek problemu wymaga znalezienia przynajmniej jednej skutecznej metody
-dowodu. Wierzchołek rozbicia wymaga natomiast rozwiązania wszystkich problemów,
-na które dany problem został rozłożony.
+Główna procedura poszukiwania dowodu uruchamia procedurę \textsc{Dowiedz}
+w pętli. Pojedyncze wywołanie nie musi od razu znaleźć całego dowodu, a może jedynie rozbudować drzewo lub oznaczyć część
+wierzchołków jako udowodnione, dlatego kolejne wywołania korzystają z coraz bardziej
+rozwiniętej struktury. Działanie kończy się sukcesem, jeżeli korzeń drzewa zostanie
+oznaczony jako udowodniony. Wtedy system odtwarza z drzewa pełny dowód tekstowy.
+Jeżeli nie uda się tego zrobić po \(N_{\max}\) próbach, procedura kończy się
+niepowodzeniem.
 
-\subsection{Rozwijanie liścia}
+\begin{algorithm}[H]
+\caption{Główna pętla poszukiwania dowodu}
+\label{alg:main-proof-loop}
+\begin{algorithmic}[1]
+\Procedure{SzukajDowodu}{$G, N_{\max}$}
+    \State utwórz korzeń $K$ typu \texttt{LP} kodujący cel $G$
 
-Liść typu \(LP\) reprezentuje sekwent, dla którego system nie zna jeszcze ani
-bezpośredniego dowodu, ani żadnego rozbicia na podproblemy. Rozwinięcie takiego
-liścia polega na podjęciu dwóch kolejnych prób.
+    \For{$i = 1,\ldots,N_{\max}$}
+        \If{$K$ jest oznaczony jako udowodniony}
+            \State \Return \Call{OdtworzDowod}{$K$}
+        \EndIf
 
-Najpierw system próbuje znaleźć bezpośredni dowód sekwentu za pomocą wcześniejszej
-strategii przeszukiwania wielu częściowych dowodów. Jeżeli taka próba zakończy się
-sukcesem, wierzchołek zostaje oznaczony jako rozwiązany. Nie ma wtedy potrzeby
-rozbijania go na podproblemy.
+        \State $b \gets$ \Call{Dowiedz}{$K$}
 
-Jeżeli bezpośredniego dowodu nie uda się znaleźć w przyjętych limitach, system
-próbuje wygenerować jedno lub kilka rozbić tego sekwentu. Poprawne rozbicia są
-dodawane jako dzieci rozwijanego wierzchołka, a do każdego z nich dodawane są
-następnie dzieci odpowiadające podproblemom danego rozbicia.
+        \If{$b = True$ albo $K$ jest oznaczony jako udowodniony}
+            \State \Return \Call{OdtworzDowod}{$K$}
+        \EndIf
+    \EndFor
 
-Schemat rozwijania liścia można zapisać tak:
-\[
-\begin{array}{l}
-\textsc{RozwińLiść}(LP):\\[0.4ex]
-\quad \text{spróbuj znaleźć bezpośredni dowód sekwentu } LP,\\
-\quad \text{jeżeli dowód został znaleziony, oznacz } LP \text{ jako rozwiązany,}\\
-\quad \text{w przeciwnym przypadku wygeneruj poprawne rozbicia } LP,\\
-\quad \text{dodaj każde rozbicie jako dziecko typu } SP,\\
-\quad \text{dla każdego rozbicia dodaj jego podproblemy jako dzieci typu } LP,\\
-\quad \text{zaktualizuj wartości logiczne odpowiednich wierzchołków.}
-\end{array}
-\]
-
-W ten sposób system łączy dwa tryby działania. Dopóki możliwe jest znalezienie
-dowodu bezpośrednio, korzysta z generowania liniowego. Dopiero gdy to się nie uda,
-przechodzi do bardziej strukturalnego kroku, czyli dekompozycji celu.
-
-\subsection{Rekurencyjne przeszukiwanie drzewa}
-
-Ostateczna strategia polega na rekurencyjnym przeszukiwaniu opisanego drzewa.
-Jeżeli aktualny wierzchołek jest już oznaczony jako rozwiązany, procedura kończy się
-sukcesem. Jeżeli jest nierozwiązanym liściem typu \(LP\), system próbuje go rozwinąć.
-Jeżeli jest wewnętrznym wierzchołkiem typu \(LP\), wystarczy znaleźć rozwiązanie dla
-jednego z jego dzieci. Jeżeli natomiast jest wierzchołkiem typu \(SP\), trzeba znaleźć
-rozwiązania dla wszystkich jego dzieci.
-
-Pseudokod można zapisać następująco:
-\[
-\begin{array}{l}
-\textsc{Przeszukaj}(v):\\[0.4ex]
-\quad \textbf{jeżeli } Value(v)=True:\\
-\qquad \textbf{zwróć } True,\\[0.4ex]
-
-\quad \textbf{jeżeli } v \text{ jest liściem typu } LP:\\
-\qquad \textsc{RozwińLiść}(v),\\
-\qquad \textbf{zwróć } Value(v),\\[0.4ex]
-
-\quad \textbf{jeżeli } v \text{ jest wewnętrznym wierzchołkiem typu } LP:\\
-\qquad \text{wybierz jedno z jego dzieci typu } SP,\\
-\qquad \textbf{jeżeli } \textsc{Przeszukaj}(SP)=True:\\
-\qquad\qquad \text{zaktualizuj wartość } v,\\
-\qquad \textbf{zwróć } Value(v),\\[0.4ex]
-
-\quad \textbf{jeżeli } v \text{ jest wierzchołkiem typu } SP:\\
-\qquad \textbf{dla każdego dziecka } u \text{ wierzchołka } v:\\
-\qquad\qquad \textbf{jeżeli } \textsc{Przeszukaj}(u)=False:\\
-\qquad\qquad\qquad \textbf{zwróć } False,\\
-\qquad \text{zaktualizuj wartość } v,\\
-\qquad \textbf{zwróć } True.
-\end{array}
-\]
-
-Ta procedura odzwierciedla różnicę między dwoma typami wierzchołków. W przypadku
-wierzchołka typu \(LP\) wystarczy znaleźć jedną skuteczną drogę dowodu, dlatego
-wybór między rozbiciami ma charakter alternatywny. W przypadku wierzchołka typu
-\(SP\) dane rozbicie narzuca listę podproblemów, z których każdy musi zostać
-udowodniony, dlatego przeszukiwanie ma charakter koniunkcyjny.
-
-Strategia trzecia jest więc połączeniem wcześniejszych metod z planowaniem
-struktury dowodu. Model językowy jest używany zarówno do generowania dowodów
-sekwentów, jak i do proponowania rozbić celów na podproblemy, natomiast formalny
-weryfikator sprawdza poprawność wszystkich wygenerowanych kroków. Dzięki temu
-system może wykorzystywać elastyczność modelu językowego, ale nie rezygnuje
-z formalnej kontroli poprawności.
-
+    \State \Return False
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{Sklejanie dowodów}
 
@@ -2331,22 +2402,6 @@ bazowych albo dopisywania końcowej reguły, zostanie wykryty przed zwróceniem
 wyniku. Ostatecznie system zwraca więc nie tylko informację, że drzewo poszukiwania
 zawiera rozwiązanie, lecz także jeden konkretny dowód w tej samej notacji tekstowej,
 która była używana podczas trenowania modelu i sprawdzania częściowych dowodów.
-\section{Strategia trzecia: dekompozycja celu i drzewo poszukiwania}
-\subsection{Motywacja}
-\subsection{Rozbicie problemu na podproblemy}
-\subsection{Format zapytania o rozbicie}
-\subsection{Sprawdzanie poprawności rozbicia}
-\subsection{Generowanie rozbić przez model}
-\subsection{Dwa typy wierzchołków drzewa}
-\subsection{Wartość wierzchołka}
-\subsection{Rozwijanie liścia}
-\subsection{Rekurencyjne przeszukiwanie drzewa}
-
-
-
-
-
-
 
 
 
@@ -2359,216 +2414,6 @@ która była używana podczas trenowania modelu i sprawdzania częściowych dowo
 
 
 
-
-\chapter{3 strategie}
-
-Celem tej pracy nie jest jedynie skonstruowanie modelu językowego generującego
-dowody w dedukcji naturalnej, lecz także zbudowanie systemu, który w pewnym stopniu
-naśladuje sposób, w jaki człowiek dochodzi do poprawnego dowodu. Sam model językowy
-może generować ciągi tekstu przypominające formalny dowód, jednak nie gwarantuje to
-ich poprawności logicznej. Z tego powodu każdy wygenerowany krok musi być na bieżąco
-weryfikowany przy użyciu opisanej wcześniej funkcji \texttt{parseProof}.
-
-Drugim problemem jest to, że konstruowanie dowodu rzadko ma charakter całkowicie
-liniowy. W praktyce często wymaga ono licznych prób, cofania się i wybierania innych
-ścieżek rozumowania, zanim zostanie znaleziony zapis końcowy. Dlatego druga wersja
-systemu rozszerza prostą generację kolejnych linii o mechanizm przeszukiwania
-przestrzeni możliwych kroków dowodowych.
-
-Wreszcie, dla trudniejszych twierdzeń samo lokalne przeszukiwanie kolejnych kroków
-może okazać się niewystarczające. System może trafiać na ślepe uliczki, ponieważ
-na początkowym etapie dowodu nie zawsze wiadomo, która strategia doprowadzi do celu.
-Z tego względu trzecia wersja systemu wprowadza możliwość rozbijania problemu na
-prostsze podproblemy, które następnie mogą zostać połączone odpowiednią regułą
-wnioskowania w rozwiązanie problemu wejściowego.
-
-System był rozwijany etapami. Najprostsza wersja zajmuje się wyłącznie generowaniem
-kolejnych linii dowodu i sprawdzaniem ich poprawności. Druga wersja dodaje mechanizm
-przeszukiwania metodą prób i błędów. Ostateczna wersja rozszerza ten schemat o
-dekompozycję celu na podproblemy. Każda kolejna wersja wykorzystuje poprzednią jako
-komponent składowy. W dalszej części rozdziału omawiam kolejno wszystkie trzy strategie.
-
-%=======DODAŁEM MAKSYMALNĄ LICZBE NIEUDANYCH PRÓB Poprawić tu i w klasie node i wyjątek na za długą linię
-Pierwsza wersja systemu zawiera się w funkcji \texttt{silliest\_generate\_proof}. Jej argumenty to \texttt{bundle} będący obiektem klasy \texttt{NanoGPTBundle} 
-którym będziemy generować tekst dowodu, \texttt{prompt} który jest zmienną tekstową, która koduje twierdzenie, które mamy udowodnić, i ewentualnie początek dowodu, 
-zmienna \texttt{temperature} typu \texttt{float}, która pozwala kontrolować poziom determinizmu generacji oraz zmienna \texttt{max\_new\_lines} typu \texttt{int}, która określa ile linii 
-dowodu chcemy wygenerować i zmienna \texttt{max\_failed\_attempts}, która oznacza ile maksymalnie kolejnych nieudanych prób dopisania linii dowodu akceptujemy. 
-Każdy prompt zaczyna się od słów \texttt{Prove that: } a następnie podana jest formuła rachunku zdań w formie infiksowej. Jeżeli kontekst bazowy w generowanym dowodzie ma być niepusty 
-to w drugiej linii znajdują się słowa:
-\texttt{assuming that: } po których wypisana jest pierwsza z formuł bazowego kontekstu. Kolejne formuły są wypisywane po przecinku i każda w nowej linii. 
-Następnie w kolejnych liniach jest dopisywany dowód.
-
-Dowód dopisujemy w pętli, która kończy się kiedy ostatnia linia koduje sekwent, który chcemy udowodnić, liczba nowych linii przekracza \texttt{max\_new\_lines} lub ilość kolejnych nieudanych prób dopisania 
-linii dowodu przekracza \texttt{max\_failed\_attempts}. W każdej iteracji pętli próbujemy dodać jedną linię dowodu. Linia jest odrzucana jeżeli występują w niej zmienne inne niż w docelowym sekwencie, linia nie spełnia
-warunków składniowych  lub jeśli 
-parsowanie dowodu z nową linią zwraca błąd. Jeżeli linia nie jest odrzucana jest dopisywana do końca dowodu i zerowany jest licznik odrzucanych linii. Funkcja zwraca \texttt{prompt\_str} z dopisanymi liniami dowodu
-(linie te nie muszą tworzyć pełnego dowodu tezy, ale intuicyjnym celem tej funjkcji jest po prostu zrobienie pewnego postępu w dowodzie).
-
-Druga wersja systemu jest zaimplementowana w funkcji \texttt{find\_proof\_little\_smarter}. Idea tej funkcji sprowadza się do tego, że zamiast tworzyć jeden dowód, tworzymy listę potencjalnych prób dowodu 
-(na początku jest w niej jedynie prompt z zakodowanym problemem do udowodnienia) i w każdej iteracji pętli głównej programu losujemy któryś element tej listy (prawdopodobieństwa są tak ustawione, by 
-im wyższe jest średnie prawdopodobieństwo tokenów w danej próbie dowodu tym wyższe jest prawdopodobieństwo wylosowania danej próby) i przy pomocy funkcji \texttt{silliest\_generate\_proof} dopisujemy do tej próby
-kolejną linię dowodu i jeżeli próby dowodu po dopisaniu tej linii nie ma w liście prób dowodów dopisujemy ją do niej. Przejdźmy teraz do bardziej szczegółowego omówienia implementacji omawianej funjkcji.
-
-\texttt{find\_proof\_little\_smarter} jako argumenty przyjmuje obiekt texttt{bundle} typu \texttt{NanoGPTBundle}, który odpowiada za generowanie kolejnych tokenów, zmienną tekstową \texttt{prompt} która koduje sekwent do udowodnienia w 
-notacji takiej samej jak w \texttt{silliest\_generate\_proof}, zmienną \texttt{temperature} typu \texttt{float} która służy do regulacji poziomu determinizmu i losowości podczas generowania kolejnych tokenów, oraz
-zmienną \texttt{max\_iter} typu \texttt{int}, która określa ile maksymalnie iteracji głównej pętli dopuszczamy.
-
-Na początku funkcja parsuje \texttt{prompt} do obiektu \texttt{goal} klasy \texttt{LittleProblem}. Bazowy kontekst \texttt{goal} jest przechowywany w liście \texttt{base\_context} Następnie tworzymy listę \texttt{prompts} w którym umieszczamy oryginalny prompt oraz tabelę \texttt{probabilities\_wild}, 
-która tworzy listę liczb potrzebnych do obliczenia, prawdopodobieństwa losowania każdego elementu \texttt{prompts}, które trzymamy w tabeli \texttt{probabilities}. 
-W pętli głównej losujemy element \texttt{prompts} i przy pomocy \texttt{silliest\_generate\_proof} 
-generujemy kolejną linię wylosowanej próby dowodu. Tak zaktualizowany prompt zapisujemy  w zmiennej \texttt{new\_prompt\_str}. Dopisujemy ją do wylosowanego prompta, a następnie przy pomocy funkcji \texttt{extract\_proof\_part} wyciągamy z tak powstałego prompta do zmiennej 
-\texttt{new\_proof} część kodującą dowód. Sprawdzamy czy numeracja wierszy w \texttt{new\_proof} jest poprawna (jeżeli nie jest wyłapujemy wyjątek i przechodzimy do kolejnej iteracji), a następnie parsujemy dowód do zmiennej \texttt{parsedProof} przy pomocy funkcji \texttt{parseProof} i używając kontekstu \texttt{base\_context} jako kontekstu bazowego. 
-Jeżeli podczas parsowania otrzymamy błąd wyłapujemy wyjątek i przechodzimy do następnej iteracji pętli. W przeciwnym przypadku jeżeli ostatnia sparsowana linia \texttt{parsedProof} jest taka sama jak sekwent docelowy to zwracamy 
-\texttt{new\_prompt\_str}. Jeśli to jeżeli \texttt{new\_prompt\_str} nie ma w tabeli \texttt{prompts} to dopisujemy ją do niej, a następnie aktualizujemy prawdopodobieństwa w sposób opisany poniżej.
-
-Do aktualizacji prawdopodobieństw używamy funkcji \texttt{prompt\_probability\_nomalised}. Jako argumenty przyjmuje \texttt{bundle} które odpowiada za liczenie prawdopodobieństw kolejnych tokenów, \texttt{prompt} którego prawdopodobieństwo
-analizujemy. Funkcja ta z założenia służy do badania prawdopodobieństwa promptów, które składają się z zakodowania sekwentu, który mamy udowodnić, 
-a także niepustej próby dowodu. Najpierw dzieli \texttt{prompt} na część kodującą sekwent oraz część próby dowodu, którą zapisujemy do zmiennej \texttt{proof}. Następnie iterując się po kolejnych znakach w 
-\texttt{proof} sumujemy do zmiennej \texttt{ans\_unnormalised} logarytmy prawdopodobieństwo warunkowe jego wystąpienia o ile znaki poprzedzające go w prompcie pozostają bez zmian. Prawdopodobieństwo to obliczamy przy pomocy funkcji 
-\texttt{last\_token\_probability\_from\_bundle}. Następnie zwracamy \texttt{ans\_unnormalised} podzielone przez długość części \texttt{proof}.
-
-Sama aktualizacja prawdopodobieństw zaczyna się od aktualizacji tabeli \texttt{probabilities\_wild}, poperzez dopisanie na jej końcu wartości \texttt{prompt\_probability\_normalised} dla używanego \texttt{bundle}
-oraz \texttt{new\_prompt\_str}. (Pole \texttt{probabilities\_wild[i]} odpowiada polu \texttt{prompts[i]}). Dla promptów, które nie posiadają części odpowiadającej za próbę dowodu funkcja \texttt{prompt\_probability\_normalised} 
-nie działa poprawnie toteż nie może zostać użyta do obliczenia wartości 
-\texttt{probabilities\_wild[0]} odpowiadającego prawdopodobieństwu promptu zawierającego sam problem bez żadnej linii dowodu toteż na wartość tego pola jest ustawiana średnia wartości pozostałych pól tablicy
-\texttt{probabilities\_wild}. Ponieważ wartości \texttt{probabilities\_wild} nie sumują się do $1$ i nie są dodatnie do tabeli \texttt{probabilities} zapisujemy wartość funkcji \texttt{soft\_max} obliczonej dla 
-tabeli \texttt{probabilities\_wild} traktowanej jako matematyczny wektor. Tak zaktualizowanej tabeli \texttt{probabilities} używamy do losowania prompta do rozwinięcia w następnej iteracji pętli. 
-Jeżeli po całym wykonaniu pętli wciąż nie znaleźliśmy dowodu funkcja \texttt{find\_proof\_little\_smarter} zwraca parę list \texttt{prompts} i \texttt{probabilities}.
-
-Ostatnia strategia, w której rozbijamy problem na podproblemy zostanie omówiona w następnych rozdziałach.
-
-\chapter{Rozbijanie problemów na podproblemy}
-\section{Obserwacja}
-W logice klasycznej rachunku zdań:
-\[
-((\Gamma_1 \vdash \varphi_1 \quad \land \quad \Gamma_2 \vdash \varphi_2 \quad \land \quad \dots \quad \land  \quad\Gamma_n \vdash \varphi_n ) \rightarrow \Gamma \vdash \varphi) 
-\]
-\[
-\leftrightarrow
-\]
-\[
-((\Gamma_1, \Gamma \vdash \varphi_1 \quad \land \quad \Gamma_2, \Gamma \vdash \varphi_2 \quad \land \quad \dots \quad \land  \quad\Gamma_n, \Gamma \vdash \varphi_n ) \rightarrow \Gamma \vdash \varphi)
-\] 
-\subsection*{Dowód}
-\subsubsection*{$(\rightarrow)$}
-Jeżeli $\Gamma_i \vdash \varphi_i$, to $\Gamma_i , \Gamma \vdash \varphi_i$ ponieważ jesteśmy w stanie skonstruować dowód $\varphi_i$ w kontekście $\Gamma_i, \Gamma$ używając jedynie formuł z kontekstu
-$\Gamma_i$. Tak więc  
-\[
-(\Gamma_1, \Gamma \vdash \varphi_1 \quad \land \quad \Gamma_2, \Gamma \vdash \varphi_2 \quad \land \quad \dots \quad \land  \quad\Gamma_n, \Gamma \vdash \varphi_n ) 
-\] 
-\[
-\rightarrow
-\]
-\[
-(\Gamma_1 \vdash \varphi_1 \quad \land \quad \Gamma_2 \vdash \varphi_2 \quad \land \quad \dots \quad \land  \quad\Gamma_n \vdash \varphi_n )
-\]
-\[
-\rightarrow
-\]
-\[
-\Gamma \vdash \varphi
-\]
-
-\subsubsection*{$(\leftarrow)$}
-Załóżmy nie wprost, że teza nie zachodzi.
-Wtedy istnieją takie konteksty $\Gamma_1,\Gamma_2,\dots,\Gamma_n,\Gamma$ i formuły $\phi_1,\phi_2,\dots,\phi_n$, że $(\Gamma_1, \Gamma \vdash \varphi_1  \land  \Gamma_2, \Gamma \vdash \varphi_2  \land  \dots  \land  \Gamma_n, \Gamma \vdash \varphi_n ) \rightarrow \Gamma \vdash \phi$ jest prawdziwe oraz, że $(\Gamma_1 \vdash \varphi_1  \land  \Gamma_2 \vdash \varphi_2  \land  \dots  \land  \Gamma_n \vdash \varphi_n ) \rightarrow \Gamma \vdash \phi$ jest fałszywe. Niech $$F(\Gamma_i) := \text{koninkcja formuł w kontekście $\Gamma_i$}$$
-Z faktu, że w logice klasycznej dla rachunku zdań każde zdanie prawdziwe dla każdego wartościowania jest dowodliwe, to $\Gamma_i \vdash \phi_i$ jest równoważne, z tautologicznością $F({\Gamma_i}) \rightarrow \varphi_i$.
-
-Fałszywość $(\Gamma_1 \vdash \varphi_1 \land  \Gamma_2 \vdash \varphi_2  \land  \dots \land \Gamma_n \vdash \varphi_n ) \rightarrow \Gamma \vdash \phi$ oznacza, że istnieje wartościowanie takie, że dla każdego $i \in \{1,2,\dots,n\}$ zachodzi $F(\Gamma_i) \rightarrow \phi_i$, ale nie zachodzi $F(\Gamma) \rightarrow \phi$, ale to oznacza, że $F(\Gamma)$ dla tego wartościowania zachodzi, z kolei $\phi$ nie zachodzi. Ale ponieważ dla każdego $i \in \{1,2,\dots,n\}$ zachodzi $F(\Gamma_i) \rightarrow \phi_i$ i $F(\Gamma)$ zachodzi to znaczy, że $i \in \{1,2,\dots,n\}$ zachodzi $(F(\Gamma_i) \land F(\Gamma)) \rightarrow \phi_i$ i $F(\Gamma)$, czyli zachodzi 
-
-\[
-(\Gamma_1, \Gamma \vdash \varphi_1 \quad \land \quad \Gamma_2, \Gamma \vdash \varphi_2 \quad \land \quad \dots \quad \land  \quad\Gamma_n, \Gamma \vdash \varphi_n ) \land F(\Gamma)
-\]
-, czyli $\phi$ zachodzi dla tego wartościowania co daje sprzeczność.
-
-
-
-
-Mimo, że dowody w dedukcji naturalnej w notacji Fitcha piszemy zaczynając od przesłanek, a następnie łączymy je odpowiednimi regułami tak by otrzymać jako konkluzję rządaną tezę, to dowody w notacji drzewiastej 
-zwykle generuje się w przeciwnym kierunku. Najpierw w korzeniu drzewa dowodu zapisujemy tezę, którą chcemy udowodnić, a następnie wybieramy regułę i przesłanki do których jeśli zastosujemy wybraną regułę możemy
-otrzymać szukaną tezę. Następnie próbujemy rekurencyjnie udowodnić owe przesłanki używając ich jako korzenie nowych poddrzew drzewa dowodu. Taka metoda jest szczególnie kożystna gdy formuła jest skomplikowana, i trudno
-przewidzieć jak zacząć dowód w notacji Fitcha tak by dało się go doprowadzić do końca. 
-
-Podobnie jak dla dowodów w notacji Fitcha rozbicia problemów będziemy kodować na dwa sposoby. Z jednej strony ich logiczną strukturę będziemy przechowywać w odpowiedniej klasie, przy pomocy której będziemy 
-kontrolować poprawność rozbić z drugiej będziemy kodować je w odpowiedniej formie tekstowej, tak by do dokonywania rozbić można było wytrenować model językowy typu \texttt{nanoGPT}
-notacji
-
-Klasą która będzie przechowywać logiczną strukturę takiego rozbicia będzie klasa \texttt{smashed\_problem}, której pola to \texttt{problem}, które zawiera obiekt klasy \texttt{LittleProblem}, który jest problemem, który 
-rozbijamy, zmienną \texttt{subproblems}, która jest listą przesłanek klasy \texttt{LittleProblem}, które otrzymujemy po rozbiciu oraz zmienną klasy \texttt{Rule}, która jest regułą, przy pomocy której dokonujemy 
-rozbicia.
-
-Gdy mamy obiekt typu \texttt{smashed\_problem} ważne jest sprawdzić, czy zakodowane w nim rozbicie jest poprawne. To znaczy, czy faktycznie stosując zakodowaną w \texttt{Rule} regułę dowodzenia do listy przesłanek w 
-\texttt{subproblems} faktycznie możemy otrzymać \texttt{Problem} oraz czy owe przesłanki faktycznie są sekwentami tautologicznymi. W tym celu używamy funkcji \texttt{is\_smashed\_correctly}. Funkcja ta jako argument 
-przyjmuje zmienną \texttt{SP} typu \texttt{smashed\_problem}. Na początku funkcja sprawdza czy wszystkie pola w \texttt{SP} mają odpowiednie typy i jeżeli tak nie jest wyrzuca ona błąd \texttt{ValueError("Bad arguments")}.  
-Następnie dla każdego elementu \texttt{SP.subproblems} sprawdza, czy koduje on sekwent tautologiczny poprzez podstawienie każdego możliwego wartościowania zmiennych. Oczywistą wadą tego podejścia jest to, że złożoność 
-tej operacji jest wykładnicza względem liczby różnych zmiennych występujących w danym sekwencie. Należy jednak zaznaczyć, że ze względu na ograniczoność zasobów obliczeniowych dostępnych na potrzeby pracy tworzony model
-i tak generuje dowody jedynie stosunkowo krótkich formuł. Dla bardziej złożonych formuł możnaby sprawdzenie wszystkich możliwości zastąpić pewnymi heurystykami np sprawdzeniu odpowiednio dużo losowych wartościowań.
-Jednocześnie samo rozbicie na nietautologiczne sekwenty nie jest bardzo problematyczne, w tym sensie, że zwykle wykonujemy równolegle kilka rozbić i wystarczy, że przynajmniej jedno rozbija problem na sekwenty tautologiczne.
-Z kolei rozbicia na sekwenty nietautologiczne nie prowadzą w dalszej części do generacji błędnych dowodów, a jedynie sprowadzają niektóre gałęzie generacji dowodu w ślepe uliczki, co spowalnia program, ale nie wpływa
-na jego poprawność. 
-
-Kolejnym krokiem jest sprawdzanie czy reguła \texttt{SP.Rule} może faktycznie rozbić \texttt{SP.problem} na \texttt{SP.subproblems}. Ponieważ nie wszystkie elementy \texttt{SP.subproblems} mają ten sam \texttt{base\_context} 
-co \texttt{SP.problem}, uniemożliwia bezpośrednie zastosowanie do nich \texttt{SP.Rule.top\_down} najpierw tworzymy tabelę \texttt{unnormalised\_subproblems} której \texttt{i}-ty element jest obiektem klasy \texttt{LittleProblem}, którego kontekst bazowy to \texttt{SP.problem.assumptions.base\_context},
-z kolei kontekst dodatkowy to wszystkie formuły zawierające się w kontekście bazowym i dodatkowym obiektu \texttt{SP.subproblems[i]}, które nie znajdują się w \texttt{SP.problem.assumptions.base\_context}. Konkluzja 
-\texttt{unnormalised\_subproblems[i]} jest taka sama jak w \texttt{SP.subproblems[i]}. Następnie stosujemy \texttt{SP.Rule.top\_down} której argumentami są lista obiektów klasy \texttt{LittleProblem} o tych samych
-kontekstach bazowych: \texttt{unnormalised\_subproblems} i odpowiednio wydedukowane z 
-\texttt{SP.problem} pozostałe argumenty. Jeśli wynik tej funkcji jest taki sam jak \texttt{SP.problem} to funkcja \texttt{is\_smashed\_correctly} zwraca \texttt{True}, zaś w przeciwnym razie \texttt{False}.
-
-
-Format tekstowy zapisu rozbicia formuły jest następujący: w pierwszej lini mamy tekst \texttt{Smash: }, po którym zostaje zapisany sekwent który chcemy rozbić. Druga linia zaczyna się od napisu \texttt{With: }
-po którym następuje nazwa reguły której używamy do rozbicia. Trzecia linia zaczyna się od tekstu \texttt{To: } po którym w następuje pierwsza przesłanka na którą zostaje rozbity rozbijany sekwent. Kolejne sekwenty 
-rozbicia są zapisywane w kolejnych liniach po przecinku. Jeżeli Lista przesłanek jest pusta prompt kodujący rozbicie kończy się po prostu na \texttt{To: }.  Do sprawdzania czy dany tekst w tym formacie koduje 
-poprawne rozbicie używamy funkcji \texttt{check\_smash\_from\_text}, która najpierw parsuje tekst kodujący rozbicie do obiektu typu \texttt{smashed\_problem}, a następnie sprawdza jego poprawność przy pomocy funjkcji \texttt{is\_smashed\_correctly}.  Jeżeli rozbicie jest niepoprawne, lub podany w argumencie prompt nie jest w odpowiednim formacie \texttt{check\_smash\_from\_text} wyrzuca błąd \texttt{TypeError} z odpowiednią wiadomością. Jeźeli zaś prompt koduje poprawne rozbicie 
-funkcja zwraca zakodowane rozbicie w formie sparsowanej.
-
-\subsection{Dwa typy wierzchołków drzewa}
-
-Aby połączyć dekompozycję celu z generowaniem dowodów częściowych, system buduje
-drzewo poszukiwania. W drzewie tym występują dwa rodzaje wierzchołków.
-
-Pierwszy rodzaj wierzchołków reprezentuje problemy dowodowe, czyli sekwenty do
-udowodnienia. Będziemy je nazywać wierzchołkami typu \(LP\), ponieważ odpowiadają
-obiektom reprezentującym pojedynczy sekwent. Dzieciami takiego wierzchołka są
-możliwe rozbicia danego sekwentu.
-
-Drugi rodzaj wierzchołków reprezentuje konkretne rozbicia problemu na podproblemy.
-Będziemy je nazywać wierzchołkami typu \(SP\). Dzieciami wierzchołka typu \(SP\)
-
-
-Do generowania poprawnych napisów kodujących rozbicie służy funkcja \texttt{silliest\_generate\_smash}. Przyjmuje ona za argumenty zmienną \texttt{bundle} typu \texttt{NanoGPTBundle} odpoowiadający za generację kolejnych tokenów oraz zmienną tekstową \texttt{prompt} kodującą sekwent który chcemy rozbić w omawianym formacie tekstowym. W bloku \texttt{try \dots exept} funkcja ta generuje kolejne linie rozbicia przy pomocy funkcji \texttt{next\_line}, które dopisujemy do zmiennej \texttt{prompt}. Robimy to aż do momentu gdy tak zaktualizowany \texttt{prompt} nie będzie spełniać predykatu \texttt{is\_ready\_to\_check\_smash}, który zwraca prawdę wtedy i tylko wtedy gdy podana jako argument zmienna tekstowa \texttt{prompt}, po uprzednim usunięciu znaków nowej linii z jej końca ma nie mniej niż 3 linie i jej ostatnim znakiem nie jest \texttt{,}. Kiedy ten predykat będzie spełniony sprawdzamy najpierw przy pomocy poprawność rozbicia zakodowanego w \texttt{prompt} przy pomocy \texttt{check\_smash\_from\_text} i jeśli nie jest poprawne wyrzucamy odpowiedni błąd, z kolei jeśli jest poprawne sprawdzamy czy w przesłankach na które rozbiliśmy rozbijany sekwent nie pojawiają się zmienne inne niż w rozbijanym sekwencie. Jeżeli tak się dzieje zwracamy wyrzucamy błęd. Jeśli podczas rozbijania zostanie wyłapany błąd zostawiamy w prompcie tylko pierwszą linię i znak nowej linii, a następnie powtarzamy całą procedurę, aż do momentu kiedy nie wygenerujemy poprawnego rozbicia.
-
-W prototypowych wersjach programu rozważane były wyłącznie dowody formuł tautologicznych, a więc sekwentów o pustym kontekście. Ograniczenie to okazało się jednak niewystarczające, ponieważ podczas rozbijania celu na prostsze podproblemy pojawiają się sekwenty o niepustych kontekstach. Aby system mógł poprawnie obsługiwać takie przypadki, konieczne było rozszerzenie go o możliwość dowodzenia sekwentów z założeniami.
-
-Z Obserwacji~1 wynika przez prostą indukcję po drzewie dowodu, że dowód
-$\Gamma \vdash \varphi$ w którym kontekst każdego wierzchołka zawiera~$\Gamma$, istnieje wtedy i tylko wtedy gdy istnieje równinież dowód sekwentu zawierający w liściach sekwenty o pustym kontekście. Toteż bez straty ogólności w całym dowodzie $\Gamma \vdash \varphi$ możemy przyjąć za prawdziwe założenia z kontekstu \texttt{Gamma}. Jest to użyteczne  ponieważ w procesie generowania dowodu mamy gwarancję, że nie trafimy w ślepą uliczkę w postaci odrzuceniu niektórych 
-założeń z dowodzonego sekwentu, do których nasz model będzie miał trudność wrócić. Jest to motywacja dlaczego \texttt{Context} jest podzielony na dwie tabele \texttt{base\_context} i \texttt{additional\_context}.
-
-
-\chapter{Klasa \texttt{node}}
-
-Aby połączyć zarówno rozbijanie problemów na podproblemy oraz generowanie dowodów w notacji Fitcha w jeden kompleksowy system będę używał klasy \texttt{node}. 
- 
-\texttt{node} koduje drzewo przeszukiwań dowodu. Drzewo to ma wierzchołki dwóch rodzajów. Pierwszy z nich w polu \texttt{Interior} zawiera obiekt klasy \texttt{LittleProblem} z kolei drugi zawiera obiekt klasy \texttt{smashed\_problem}.
-Dla uproszczenia będę wierzchołki pierwszego rodzaju nazywać \texttt{LPNode}, z kolei wierzchołki drugiego rodzaju będę nazywać \texttt{SPNode} mimo, że takie nazewnictwo nie występuje w samym kodzie programu. Dzieci rodzaju \texttt{LPNode} są rodzaju \texttt{SPNode}, z kolei dzieci rodzaju \texttt{SPNode} są rodzaju \texttt{LPNode}. Precyzyjniej dziećmi wierzchołków zawierających w polu \texttt{Interior} obiekt klasy \texttt{LittleProblem} kodujący pewien sekwent, w polu \texttt{Interior} mają obiekty klasy \texttt{smashed\_problem} kodujące poprawne rozbicia tego obiektu. Z kolei dzieci wierzchołków zawierających w polu \texttt{Interior} obiekt klasy \texttt{smashed\_problem} mają w polu \texttt{Interior} obiekty klasy \texttt{LittleProblem} zawierające przesłanki tego rozbicia. 
-
-Poza zmienną \texttt{Interior} klasa \texttt{node} zawiera też pole \texttt{Parent} które wskazuje na rodzica wierzchołka, pole \texttt{Children} listę dzieci, pole \texttt{Text}, które dla \texttt{LPNode} zawiera prompta z zapytaniem o dowód
-sekwentu w polu \texttt{Interior} lub zapytanie wraz z pełnym dowodem oraz pole \texttt{Probability}, które dla \texttt{SPNode} określa prawdopodobieństwo, że wybierzemy do analizy ten wierzchołek schodząc w dół od jego rodzica. Ostatnim polem jest zmienna boolowska \texttt{Value}. Dla liści typu \texttt{LittleProblem} ma wartość \texttt{False} jeśli w polu \texttt{Text} zawiera ona prompta jedynie z zapytaniem o dowód sekwentu i \texttt{True} jeśli w tym polu
-prompt składa się z zarówno zapytania jak i dowodu. Dla wierzchołków wewnętrznych rodzaju \texttt{LPNode} wartość \texttt{Value} to alternatywa wartości \texttt{Value} dzieci tego wierzchołka. Wierzchołek rodzaju \texttt{SPNode} może być liściem tylko wtedy, gdy lista przesłanek obiektu klasy \texttt{smashed\_problem} w zakodowanym w jego polu \texttt{Interior} jest pusta. Wtedy też wartość pola \texttt{Value} dla tego wierzchołka jest równa \texttt{True}. Dla wierzchołków wewnętrznych rodzaju \texttt{SPNode} pole \texttt{Value} jest równe koniunkcji wartości pól \texttt{Value} jego dzieci. 
-
-
-
-
-%DZIELE PRZEZ SUME WAG A NIE DEG
-Metoda \texttt{Smash\_Leaf} klasy \texttt{node} odpowiada za doczepianie do dzieci rodzaju \texttt{SPNode} które zawierają zakodowane rozbicia pola \texttt{Interior} swojego rodzica, a następnie doczepienia do tych dzieci ich dzieci
-rodzaju \texttt{LPNode} z przesłankami rozbicia kodowanego w ich rodzicach. Funkcja ta przyjmuje jako argumenty obiekt \texttt{bundle\_smashing} typu \texttt{NanoGPTBundle} odpowiadający za generowanie rozbić, oraz zmienna całkowitoliczbowa \texttt{deg} oznaczająca ile rozbić (nie koniecznie różnych) które będziemy wykonywać. Na początku tworzymy prompta zaczynającego się od \texttt{Smash: }, po którym następuje zapis sekwentu, który chcemy rozbijać i znak nowej lini. Następnie \texttt{deg} rzay przy pomocy metody \texttt{silliest\_generate\_smash} dopisujemy do tego prompta tekstową reprezentację rozbicia. Ponieważ częso model umie dość dobrze znajdować najkożystniejsze rozbicie, często one się powtażają. Dlatego tekstowe reprezentacje wygenerowanych rozbić przechowujemy jako klucze słwonika \texttt{weights}, w którym \texttt{weights[i]} jest równa liczbie ile razy uruchomiona funkcja \texttt{Smash\_Leaf} 
-wygenerowała \texttt{i}. Następnie do tabeli \texttt{Children} rozbijanego wierzchołka dodajemy obiekty klasy \texttt{node}, które w polu \texttt{Interior} mają zparsowaną przy pomocy \texttt{check\_smash\_from\_text} do obiektu klasy  \texttt{smashed\_problem} wygenerowaną wcześniej tekstową reprezentację rozbicia, z kolei w polu \texttt{Probability} ma iloraz liczby ile razy dana reprezentacja tekstowa została wygenerowana i liczby \texttt{deg}. Kolejnym krokiem jest dla każdego z tych dopisanych dzieci dopisanie do tabeli \texttt{Children} ich dzieci obiekty klasy \texttt{node}, które w polu \texttt{Interior} mają obiekty typu \texttt{LittleProblem} reprezentujące przesłanki rozbić zakodowanych w ich rodzicach. Załóżmy, że któreś z dzieci wierzchołka podanego jako argument dla funkcji \texttt{Smash\_Leaf} po wykonaniu wcześniej omawianych kroków nie ma dzieci. Oznacza to, że sekwent którego rozbicie jest zakodowane w tym dziecku nie potrzebuje dodatkowych kroków dowodu by go udowodnić. Ustawiamy wtedy pole \texttt{Value} tego dziecka na \texttt{True} i aktualizujemy wartości pola \texttt{Value} dla wszystkich jego przodków.
-
-Kolejną metodą klasy \texttt{node} jest funkcja \texttt{RunLeaf}. Próbuje najpierw znaleźć dowód sekwentu, który w polu \texttt{Interior} przechowuje obiekt, który ją wywołuje, a jeśli nie jest w stanie tego zrobić dokonuje jego rozbicia przy pomocy metody \texttt{Smash\_Leaf}. Funkcja ta przyjmuje dwa obiekty klasy \texttt{NanoGPTBoundle}. Pierwszym z nich jest obiekt \texttt{bundle\_proving} generujący dowody sekwentów, drugim zaś z kolei jest
- \texttt{bundle\_smashing}
-odpowiadający za generowanie rozbić. Kolejnym argumentem jest zmienna zmiennoprzecinkowa \texttt{temperature} regulująca poziom determinizmu przy generowaniu dowodów, zmienna całkowitoliczbowa \texttt{max\_iter}, która określa maksymalną liczbę iteracji prób dopisania kolejnej linii przy próbie generowania dowodu, a także \texttt{deg}, która reguluje ile rozbić (niekoniecznie różnych) mamy wykonać, jeżeli sekwentu nie uda się udowodnić. Na początku funkcja sprawdza czy wywołujący ją obiekt jest liściem i czy jest \texttt{LPNode}. Jeżeli tak nie jest funkcja zwraca wyjątek z odpowiednim komentarzem.  Następnie  tworzymy prompta z zapytaniem o dowód sekwentu, kóry znajduje się w polu \texttt{Interior} wierzchołka w którym się znajdujemy. Zapytanie to podajemy do funkcji \texttt{find\_proof\_little\_smarter} która przy pomocy \texttt{bundle\_proving} próbuje udowodnić zadany w prompcie sekwent. Jeżeli to się uda funkcja ta zwraca obiekt klasy \texttt{str} z dowodem, jeżeli zaś nie zwraca ona tabelę prób i pomocniczych prawdopodobieństw. Sprawdzamy więc czy \texttt{find\_proof\_little\_smarter} zwróci zmienną typu \texttt{str} a jeśli tak to w polu \texttt{Text} wierzchołka w którym się znajdujemy zapisujemy ten dowód, a następnie ustawiamy wartość jego pola \texttt{Value} na \texttt{True} i aktualizujemy wartości pola \texttt{Value} dla jego przodków. W przeciwnym razie rozbijamy obiekt którym wywołaliśmy metodę \texttt{RunLeaf} metodą \texttt{Smash\_Leaf} używając \texttt{bundle\_smashing} i podaną w argumencie do \texttt{RunLeaf} zmienną \texttt{deg}. Jeżeli \texttt{RunLeaf} uda się znaleźć dowód zwracamy \texttt{True}. W przeciwnym wypadku zwracamy \texttt{False}.
-
-
-Kolejną metodą klasy \texttt{node} jest funkcja \texttt{TryNode}. Funkcja ta próbuje przeprowadzić cały dowód zadanego sekwentu a także jeśli to się nie uda zaktualizować drzewo tak by było bliższe znalezienia owego dowodu. Argumenty tej funkcji mają takie same nazwy, typy oraz zastosowania jak argumenty funkcji \texttt{RunLeaf}. Jeżeli znalezienie dowodu się powiedzie funkcja zwraca \texttt{True}, a w przeciwnym wypadku zwraca \texttt{False}. Działanie tej funkcji dzielimy na trzy nietrywialne przypadki przy czym przez znalezienie dowodu dla każdego z nich rozumiemy następująco. Dla przypadku liścia rodzaju \texttt{LPNode} jest to udowodnienie sekwentu zakodowanego w polu \texttt{Interior}, dla wierzchołków wewnętrznych rodzaju \texttt{LPNode} przez znalezienie dowodu rozumiemy znalezienie dowodu dla któregoś z jego dzieci, z kolei dla wierzchołków wewnętrznych rodzaju \texttt{SPNode} przez znalezienie dowodów dla wszystkich jego dzieci. Ostatnim trywialnym przypadkiem jest gdy wierzchołek wywołujący funkcję ma w polu \texttt{Value} wartość \texttt{True}, co oznacza, że dowód dla tego wierzchołka już został znaleziony i wtedy funkcja \texttt{TryNode}. zwraca \texttt{True}. Jeżeli obiekt wywołujący tą funkcję jest liściem typu \texttt{LPNode} uruchamiamy dla dla niego metody \texttt{RunLeaf}, z pozostałymi argumentami takimi samymi jak te podane jako argumenty dla \texttt{TryNode} i zwracamy jej wartość. Jeżeli jesteśmy w wierzchołku wewnętrznym rodzaju \texttt{LPNode} losujemy jego dziecko, króre jest rodzaju \texttt{SPNode} i  rekurencyjnie wykonujemy \texttt{TryNode} wywołane przez to dziecko z pozostałymi argumentami takimi samymi jak jak w wywołaniu dla jego rodzica i zwracamy wartość tego wywołania. Jeżeli zaś jesteśmy w wierzchołku \texttt{SPNode} wywołujemy funkcję \texttt{TryNode} dla kolejnych jego dzieci (pozostałe argumenty dla każdego dziecka są takie same jak dla wywołania dla rodzica), aż do momentu kiedy któreś z tych wywołań zwróci \texttt{False}. Wtedy wywołanie dla rodzica tych dzieci również zwraca \texttt{False}. Jeżeli każde wywołanie dla dzieci zwróci \texttt{True} to funkcja dla rodzica również zwraca \texttt{True}.
 
 \chapter{Generowanie korpusu}
 

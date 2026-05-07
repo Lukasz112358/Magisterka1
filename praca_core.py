@@ -54,6 +54,9 @@ import numpy as np
 
 from tqdm import tqdm
 
+
+
+
 class Rule:
 
     @abstractmethod
@@ -1891,16 +1894,19 @@ def is_smashed_correctly(SP):
     unnormalised_subproblems = []
 
     def unnormalize_subproblem(x):
-        base_context = SP.problem.assumptions.base_context
-        additional_context = []
-        for i in x.assumptions.base_context:
-            if i not in base_context:
-                additional_context += [i]
-        for i in x.assumptions.additional_context:
-            if i not in base_context:
-                additional_context += [i]
+        #base_context = SP.problem.assumptions.base_context
+        #additional_context = []
+        #for i in x.assumptions.base_context:
+        #    if i not in base_context:
+        #        additional_context += [i]
+        #for i in x.assumptions.additional_context:
+        #    if i not in base_context:
+        #        additional_context += [i]
+        base_context = []
+        additional_context = x.assumptions.base_context + x.assumptions.additional_context
         conclusion = x.conclusion
         return LittleProblem(Context(base_context, additional_context), conclusion)
+    Problem_unnormalised_main = unnormalize_subproblem(SP.problem)
     for i in SP.subproblems:
         if not is_LP_tautology(i):
             raise ValueError('Bad arguments')
@@ -1920,59 +1926,59 @@ def is_smashed_correctly(SP):
                     break
             if psi is None:
                 psi = assumptions_thesis[-1]
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems, psi=psi)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems, psi=psi)
         case ImplicationIntroduction():
             phi = SP.problem.conclusion.Left()
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems, phi=phi)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems, phi=phi)
         case NegationIntroduction():
             phi = SP.problem.conclusion.Left()
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems, phi=phi)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems, phi=phi)
         case ImplicationElimination():
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems)
         case NegationElimination():
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems)
         case ConjunctionIntroduction():
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems)
         case DisjunctionIntroduction1():
             psi = SP.problem.conclusion.Right()
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems, psi=psi)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems, psi=psi)
         case DisjunctionIntroduction2():
             phi = SP.problem.conclusion.Left()
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems, phi=phi)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems, phi=phi)
         case TruthIntroduction():
             BaseContext = SP.problem.assumptions.base_context
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems, BaseContext)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems, BaseContext)
         case ConjunctionElimination1():
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems)
         case ConjunctionElimination2():
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems)
         case DisjunctionElimination():
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems)
         case LieElimination():
             phi = SP.problem.conclusion
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems, phi=phi)
+            return Problem_unnormalised_main== SP.rule.top_down(unnormalised_subproblems, phi=phi)
         case IffIntroduction():
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems)
+            return Problem_unnormalised_main== SP.rule.top_down(unnormalised_subproblems)
         case IffElimination1():
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems)
         case IffElimination2():
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems)
         case RAA():
             phi = SP.problem.conclusion
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems, phi=phi)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems, phi=phi)
         case NegationOfNegation():
             phi = SP.problem.conclusion
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems)
         case TND():
             BaseContext = SP.problem.assumptions.base_context
             phi = SP.problem.conclusion.Left()
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems, phi=phi, BaseContext=BaseContext)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems, phi=phi, BaseContext=BaseContext)
         case FromContext():
             phi = SP.problem.conclusion
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems, phi=phi)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems, phi=phi)
         case FromWeakenContext():
             phi = SP.problem.conclusion
-            return SP.problem == SP.rule.top_down(unnormalised_subproblems, phi=phi)
+            return Problem_unnormalised_main == SP.rule.top_down(unnormalised_subproblems, phi=phi)
         case _:
             pass
 
