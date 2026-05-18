@@ -16,6 +16,8 @@
 \usepackage{algpseudocode}
 \usepackage{listings}
 \usepackage{float}
+\raggedbottom
+\usepackage{enumitem}
 \lstset{
   basicstyle=\ttfamily\small,
   columns=fullflexible,
@@ -430,7 +432,7 @@ $$
      \newline
      $\dots$
      \newline
-     i. $\psi \qquad$ →-elimination k, j
+     i. $\psi \qquad$ →-elimination, k, j
      }
 
 
@@ -918,7 +920,7 @@ czy otrzymany wynik jest poprawny. Błędne kandydatury mogą być po prostu
 odrzucane przez przechwycenie błędu.
 
 \section{Reprezentacja dowodów}
-
+\label{sec:Reprezentacja dowodów}
 W poprzednim rozdziale przyjęliśmy, że każda linia dowodu koduje jeden sekwent.
 Na pierwszy rzut oka mogłoby się więc wydawać, że po sparsowaniu dowodu wystarczy
 przechowywać wyłącznie sekwenty odpowiadające kolejnym liniom. Takie rozwiązanie
@@ -1035,6 +1037,88 @@ tworzy linii treningowych przez ręczne sklejanie napisów, lecz najpierw konstr
 poprawny obiekt linii, a dopiero potem wypisuje go w ustalonym formacie tekstowym.
 Dzięki temu każda wygenerowana linia ma od razu odpowiadającą jej strukturę
 logiczną, którą parser potrafi ponownie odtworzyć.
+
+
+\subsection{Modele językowe}
+
+W niniejszej pracy jednym z podstawowych narzędzi wykorzystywanych do konstrukcji
+systemu dowodzącego są modele językowe. Modelem językowym nazywamy model, którego
+zadaniem jest opisywanie regularności występujących w tekstach. W praktyce można
+go rozumieć jako system, który dla danego początkowego fragmentu tekstu przewiduje,
+jakie elementy mogą pojawić się dalej. W typowych zastosowaniach tekstem takim
+może być tekst w języku naturalnym, fragment programu komputerowego albo odpowiedź
+na pytanie. W tej pracy tekstem generowanym przez model będą natomiast dowody w
+ustalonej notacji oraz zapisy rozbić problemów logicznych na prostsze podproblemy.
+
+Tekst przekazywany do modelu nie jest zwykle analizowany jako ciąg znaków w
+najprostszym sensie. Najpierw zostaje on podzielony na tokeny, czyli jednostki,
+na których bezpośrednio operuje model. Tokenami mogą być pojedyncze znaki,
+fragmenty słów, całe słowa albo inne fragmenty tekstu zależnie od przyjętej
+metody kodowania. Po takim zakodowaniu tekst można traktować jako ciąg tokenów.
+Zadaniem modelu językowego jest wtedy przewidywanie kolejnych tokenów na podstawie
+tokenów wcześniejszych.
+
+W pracy korzystam z modeli autoregresyjnych. Model autoregresyjny generuje tekst
+krok po kroku. Mając pewien ciąg tokenów wejściowych, wyznacza rozkład
+prawdopodobieństwa następnego tokenu. Następnie wybrany token jest dopisywany do
+dotychczasowego tekstu i cały proces może zostać powtórzony. W ten sposób model,
+który w pojedynczym kroku przewiduje tylko jeden następny token, może wygenerować
+dłuższy fragment tekstu. Modele typu GPT są właśnie przykładami takich modeli
+autoregresyjnych opartych na architekturze transformerów
+\cite{vaswani2017attention,radford2019language}.
+
+Trenowanie modelu językowego polega na uczeniu go przewidywania kolejnych tokenów
+w tekstach pochodzących z korpusu treningowego. Model otrzymuje fragment tekstu
+i ma przewidzieć tokeny występujące po nim. Następnie jego parametry są zmieniane
+tak, aby zwiększać prawdopodobieństwo tych tokenów, które rzeczywiście wystąpiły
+w danych treningowych. Można więc powiedzieć, że model uczy się regularności
+obecnych w korpusie: zarówno prostych zależności lokalnych między sąsiednimi
+tokenami, jak i bardziej złożonych wzorców pojawiających się w dłuższych
+fragmentach tekstu.
+
+W niniejszej pracy szczególnie istotne jest to, że tekstem, którego regularności
+ma nauczyć się model, nie jest zwykły tekst w języku naturalnym, lecz zapis
+dowodu albo zapis rozbicia problemu logicznego. Dowody w rozważanej notacji mają
+bardzo regularną strukturę: każda linia zawiera formułę, nazwę zastosowanej
+reguły oraz indeksy wcześniejszych linii, do których dana reguła się odwołuje.
+Podobnie zapisy rozbić problemów na podproblemy mają ustalony format tekstowy.
+Pozwala to potraktować generowanie kolejnych kroków dowodu jako szczególny
+przypadek generowania tekstu.
+
+Jako bazę implementacyjną wykorzystuję projekt \texttt{nanoGPT}
+\cite{karpathy2022nanogpt}. Jest to niewielka implementacja modelu typu GPT,
+która pozwala trenować modele językowe na własnych korpusach tekstowych. W moim
+systemie trenowane są modele wyspecjalizowane do konkretnych zadań związanych
+z dowodzeniem. Jeden z nich służy do generowania dowodów sekwentów z założeniami,
+natomiast drugi do generowania rozbić problemów na prostsze podproblemy. Oba
+modele uczone są na specjalnie przygotowanych korpusach, których konstrukcja
+zostanie omówiona w dalszej części pracy.
+
+Należy jednak podkreślić, że model językowy nie jest w tej pracy traktowany jako
+samodzielny system dowodzący. Sam fakt, że model wygenerował tekst przypominający
+dowód, nie oznacza jeszcze, że jest to dowód poprawny formalnie. Model może
+wskazać niewłaściwą regułę, odwołać się do niepasujących linii albo wygenerować
+formułę, która nie jest konkluzją wynikającą z podanych przesłanek. Dlatego model
+pełni rolę komponentu heurystycznego: proponuje kolejne kroki dowodu albo możliwe
+rozbicia problemu, natomiast ich poprawność jest sprawdzana przez część symboliczną
+systemu.
+
+Takie połączenie modelu językowego i formalnego weryfikatora jest naturalne dla
+rozważanego problemu. Z jednej strony klasyczne, czysto symboliczne przeszukiwanie
+przestrzeni dowodów może być trudne, ponieważ często nie wiadomo, którą regułę
+wnioskowania zastosować i jakie formuły pomocnicze należy wprowadzić. Z drugiej
+strony model językowy może nauczyć się z korpusu, jakie kroki dowodowe często
+pojawiają się w podobnych sytuacjach. Nie gwarantuje on jednak poprawności tych
+kroków. Weryfikator pełni więc rolę filtra, który odrzuca propozycje niepoprawne
+i pozwala wykorzystać tylko te fragmenty wygenerowanego tekstu, które rzeczywiście
+kodują poprawne zastosowania reguł wnioskowania.
+
+W rezultacie system nie polega wyłącznie na generowaniu tekstu przez model, ale
+łączy dwa podejścia. Część neuronowa służy do podpowiadania potencjalnych kierunków
+dowodu, natomiast część symboliczna odpowiada za jednoznaczną interpretację
+wygenerowanych linii i sprawdzenie ich poprawności. Dzięki temu można wykorzystać
+zdolność modeli językowych do rozpoznawania regularności w danych tekstowych,
+jednocześnie zachowując formalną kontrolę nad poprawnością konstruowanych dowodów.
 
 
 
@@ -2278,144 +2362,760 @@ niepowodzeniem.
 \end{algorithmic}
 \end{algorithm}
 
+
 \subsection{Sklejanie dowodów}
 
-Opisane wcześniej drzewo poszukiwania pozwala stwierdzić, czy dany problem został
-rozwiązany, ale sama wartość logiczna wierzchołka nie jest jeszcze końcowym dowodem
-w notacji tekstowej. Jeżeli problem został rozwiązany przez bezpośrednie wygenerowanie
-dowodu, sytuacja jest prosta: wystarczy zwrócić znaleziony dowód. Jeżeli jednak
-problem został rozwiązany przez rozbicie na podproblemy, trzeba jeszcze połączyć
-dowody tych podproblemów w jeden dowód problemu wejściowego.
+Samo znalezienie rozwiązania w drzewie poszukiwania nie oznacza jeszcze, że mamy
+gotowy tekstowy dowód pierwotnej tezy. Drzewo zawiera informację o tym, które
+podproblemy zostały udowodnione oraz przez jakie rozbicia można je połączyć, ale
+sam dowód jest rozproszony po różnych wierzchołkach. 
 
-Operacja ta odpowiada odwróceniu procesu rozbijania. Wierzchołek typu \(SP\)
-przechowuje regułę wnioskowania oraz listę podproblemów. Jeżeli dla każdego
-z tych podproblemów znaleziono dowód, to można najpierw umieścić te dowody jeden
-po drugim, a następnie dopisać na końcu linię, która stosuje regułę zapisaną
-w rozbiciu do ostatnich linii odpowiednich poddowodów. W ten sposób z dowodów
-przesłanek otrzymujemy dowód konkluzji.
+Procedura sklejania działa rekurencyjnie od liści drzewa ku korzeniowi. Jeżeli
+rozwiązany wierzchołek typu \texttt{LP} jest liściem, to zawiera bezpośrednio
+wygenerowany dowód danego sekwentu. Taki dowód może mieć niepusty kontekst
+bazowy, dlatego najpierw stosowana jest opisana wcześniej procedura usuwania
+kontekstu bazowego. W efekcie otrzymujemy zwykły fragment dowodu, który można
+wkleić do większego dowodu.
 
-Najprostszy przypadek zachodzi wtedy, gdy reguła użyta w rozbiciu nie wymaga
-dodatkowych założeń lokalnych. Wtedy procedura sklejania wykonuje trzy kroki:
+Jeżeli natomiast wierzchołek typu \texttt{LP} nie jest liściem, to znaczy, że został
+rozwiązany przez jedno ze swoich rozbić. Wtedy procedura przechodzi do tego dziecka
+typu \texttt{SP}, które zostało oznaczone jako udowodnione. Dla wierzchołka typu
+\texttt{SP} najpierw rekurencyjnie odtwarzane są dowody wszystkich jego dzieci, czyli
+poddowody przesłanek rozbicia. Następnie te poddowody są łączone w jeden ciąg
+linii, a na końcu dopisywana jest linia stosująca regułę zapisaną w rozbiciu.
+
+Oczywiście łączenie dowodów wymaga odpowiedniej numeracji linii. Numeracja w każdym poddowodzie
+rozpoczynana jest od \texttt{1}, dlatego
+przed połączeniem kolejnych fragmentów wszystkie indeksy w danym poddowodzie są
+przesuwane o liczbę linii występujących we wcześniejszych fragmentach. Dotyczy to
+zarówno numerów samych linii, jak i odwołań do wcześniejszych linii zapisanych przy
+regułach.
+
+Jeżeli mamy poddowody
 \[
-\begin{array}{l}
-\textsc{SklejDowody}(D_1,\ldots,D_n,R,S):\\[0.4ex]
-\quad \text{przenumeruj linie dowodów } D_1,\ldots,D_n,\\
-\quad \text{połącz je w jeden ciąg linii,}\\
-\quad \text{dopisz linię stosującą regułę } R
-      \text{ do końcowych linii poddowodów,}\\
-\quad \text{sprawdź parserem poprawność otrzymanego dowodu,}\\
-\quad \text{zwróć połączony dowód.}
-\end{array}
+D_1,\ldots,D_n,
 \]
+ich ostatnie linie kodują sekwenty będące
+przesłankami reguły, przez którą dane podproblemy zostały połączone w drzewie
+poszukiwania. Numery tych linii (po przenumerowaniu) mogą więc zostać użyte jako odwołania w końcowej
+linii sklejającej dowód.
 
-Przenumerowanie linii jest konieczne, ponieważ każdy poddowód jest generowany jako
-osobny fragment zaczynający się od linii numer \(1\). Po połączeniu kilku takich
-fragmentów odwołania do wcześniejszych linii muszą zostać przesunięte o liczbę linii
-występujących w poprzednich poddowodach. Bez tego dwa różne poddowody mogłyby
-zawierać linie o tych samych numerach, a odwołania w regułach wskazywałyby
-nieprawidłowe miejsca.
 
-Dodatkowym problemem jest obecność kontekstu bazowego w dowodach podproblemów.
-Poddowód sekwentu z założeniami może być zapisany w formie, w której założenia
-te występują w nagłówku promptu jako kontekst bazowy. Przy sklejaniu kilku
-poddowodów wygodniej jest jednak mieć jeden zwykły ciąg linii dowodu, bez osobnych
-nagłówków dla każdego fragmentu. Dlatego przed połączeniem poddowodów kontekst
-bazowy zostaje usunięty z nagłówka i wprowadzony jawnie jako początkowe linie
-dowodu. Założenia z kontekstu są więc zamieniane na zwykłe linie, do których można
-się później odwoływać.
+Kolejność tych numerów musi odpowiadać kolejności przesłanek danej reguły. W implementacji
+zapewnia to struktura drzewa poszukiwania: dzieci węzła reprezentującego rozbicie
+są przechowywane w tej samej kolejności, w jakiej odpowiadają przesłankom reguły
+użytej do rozbicia. Dzięki temu, po sklejeniu poddowodów, można odczytać numery
+ich końcowych linii jako uporządkowaną listę argumentów końcowej reguły.
 
-Schematycznie można to przedstawić następująco:
+Dla większości reguł wystarczy więc połączyć przenumerowane poddowody, a następnie
+dopisać jedną linię postaci
 \[
-\small
-\begin{array}{c}
-\text{dowody}\\[-0.2ex]
-\text{podproblemów}
-\end{array}
-\;\longrightarrow\;
-\begin{array}{c}
-\text{usunięcie}\\[-0.2ex]
-\text{kontekstów bazowych}
-\end{array}
-\;\longrightarrow\;
-\begin{array}{c}
-\text{przenumerowanie}\\[-0.2ex]
-\text{linii}
-\end{array}
-\;\longrightarrow\;
-\begin{array}{c}
-\text{dopisana}\\[-0.2ex]
-\text{reguła sklejająca}
-\end{array}
-\;\longrightarrow\;
-\begin{array}{c}
-\text{pełny}\\[-0.2ex]
-\text{dowód}
-\end{array}.
+k_n+1\texttt{. }\text{konkluzja rozbicia}
+\qquad
+R,\; k_1, \ldots, k_n,
 \]
+gdzie \(k_1,\ldots,k_n\) są numerami końcowych linii odpowiednich poddowodów. Separatory występujące
+w uzasadnieniu linii są przy tym generowane zgodnie z formatem tekstowym danej
+reguły. W omawianych tu przypadkach są to przecinki oddzielające kolejne indeksy.
 
-Niektóre reguły wymagają przy sklejaniu dodatkowej ostrożności. Dotyczy to przede
-wszystkim reguł, które usuwają pewne założenie z kontekstu, takich jak wprowadzenie
-implikacji, wprowadzenie negacji oraz \(RAA\). W takich przypadkach sama końcowa
-linia poddowodu nie wystarcza, ponieważ reguła musi odwołać się również do linii
-wprowadzającej odpowiednie założenie lokalne. Dlatego procedura sklejania wprowadza
-najpierw dodatkową linię odpowiadającą temu założeniu, a dopiero potem dopisuje
-linię stosującą właściwą regułę.
+Niektóre reguły wymagają jednak dodatkowej ostrożności. W implementacji wyróżnione
+są reguły, których zapis tekstowy odwołuje się nie tylko do linii będących
+bezpośrednimi przesłankami reguły, ale także do dodatkowych linii pomocniczych.
 
-Przykładowo, przy sklejaniu dowodu dla implikacji \(\varphi \to \psi\) poddowód
-prowadzi do \(\psi\) w kontekście rozszerzonym o \(\varphi\). Aby otrzymać końcową
-linię z \(\varphi \to \psi\), system musi wskazać zarówno linię, w której założono
-\(\varphi\), jak i linię, w której uzyskano \(\psi\). Analogiczna sytuacja zachodzi przy
-wprowadzaniu negacji, gdzie lokalne założenie \(\varphi\) prowadzi do sprzeczności,
-oraz przy \(RAA\), gdzie lokalne założenie \(\neg\varphi\) prowadzi do sprzeczności.
 
-Ostateczna procedura odtwarzania dowodu z drzewa działa rekurencyjnie. Jeżeli
-wierzchołek typu \(LP\) jest rozwiązanym liściem, zwracany jest jego bezpośredni
-dowód po sprowadzeniu kontekstu bazowego do zwykłych linii dowodu. Jeżeli
-wierzchołek typu \(LP\) został rozwiązany przez jedno ze swoich dzieci, procedura
-przechodzi do tego dziecka. Jeżeli natomiast wierzchołek jest typu \(SP\), najpierw
-rekurencyjnie odtwarzane są dowody wszystkich jego dzieci, a następnie są one
-sklejane przy użyciu reguły zapisanej w tym rozbiciu.
-
-Można to zapisać następująco:
+Dotyczy to reguł:
 \[
-\begin{array}{l}
-\textsc{OdtwórzDowód}(v):\\[0.4ex]
-\quad \textbf{jeżeli } Value(v)=False:\\
-\qquad \text{zgłoś błąd,}\\[0.4ex]
-
-\quad \textbf{jeżeli } v \text{ jest rozwiązanym liściem typu } LP:\\
-\qquad \textbf{zwróć } \text{dowód zapisany w } v,\\[0.4ex]
-
-\quad \textbf{jeżeli } v \text{ jest wewnętrznym wierzchołkiem typu } LP:\\
-\qquad \text{wybierz dziecko } u \text{ takie, że } Value(u)=True,\\
-\qquad \textbf{zwróć } \textsc{OdtwórzDowód}(u),\\[0.4ex]
-
-\quad \textbf{jeżeli } v \text{ jest wierzchołkiem typu } SP:\\
-\qquad \text{dla każdego dziecka } u_i \text{ oblicz } D_i=\textsc{OdtwórzDowód}(u_i),\\
-\qquad \textbf{zwróć } \textsc{SklejDowody}(D_1,\ldots,D_n,R,S).
-\end{array}
+\texttt{weakening}, \qquad
+\to\texttt{-introduction}, \qquad
+\neg\texttt{-introduction}, \qquad
+\texttt{RAA}.
 \]
+Dla takich reguł nie wystarcza wskazanie samych końcowych linii poddowodów.
+Trzeba jeszcze dopisać odpowiednią linię pomocniczą, do której końcowa reguła będzie
+mogła się odwołać. W tym celu każdą z tych linii rozpatrujemy osobno.
 
-Po sklejeniu dowód jest ponownie przekazywany parserowi. Dzięki temu nawet jeżeli
-błąd pojawi się dopiero na etapie przesuwania indeksów, usuwania kontekstów
-bazowych albo dopisywania końcowej reguły, zostanie wykryty przed zwróceniem
-wyniku. Ostatecznie system zwraca więc nie tylko informację, że drzewo poszukiwania
-zawiera rozwiązanie, lecz także jeden konkretny dowód w tej samej notacji tekstowej,
-która była używana podczas trenowania modelu i sprawdzania częściowych dowodów.
+Przykładowo dla reguły wyprowadzania implikacji końcowa linia ma postać
+\[
+\texttt{i. }
+    \varphi \to \psi
+    \qquad
+    \to\texttt{-introduction j–k}, 
+\]
+Indeks \texttt{k} wskazuje linię przesłanki, z kolei indeks \texttt{j} wskazuje linię,
+z której odczytujemy argument \(\varphi\) którego nie jesteśmy w stanie jednoznacznie zidentyfikować
+na podstawie samej przesłanki. W tym celu do złączonych dowodów przesłanek dodajemy linię, która przy pomocy reguły \texttt{assumption}
+wyprowadza argument \(\varphi\). Indeks tej linii jest następnie używany jako indeks \texttt{j} w końcowej linii.
+Podobne schematy konstruujemy dla reguł \texttt{weakening}, \texttt{negation-introduction} oraz \texttt{RAA}.
 
 
+Ogólny schemat sklejania poddowodów odpowiadających jednemu rozbiciu można
+zapisać następująco:
+
+\begin{algorithm}[H]
+\caption{Sklejanie poddowodów jednego rozbicia}
+\label{alg:glue-up}
+\begin{algorithmic}[1]
+\Procedure{Sklej}{$D_1,\ldots,D_n, S$}
+    \State \(R \gets\) reguła zapisana w rozbiciu \(S\)
+    \State \(P \gets\) problem rozbijany przez \(S\)
 
 
-\section{Podsumowanie strategii}
+    \State \(B \gets\) pusty tekst dowodu
+    \State \(k \gets 0\)
 
+    \For{\(i = 1,\ldots,n\)}
+        \If{\(D_i\) ma niepusty kontekst bazowy}
+            \State \(D_i \gets\) wynik usunięcia kontekstu bazowego z \(D_i\)
+        \EndIf
 
+        \State przesuń wszystkie indeksy w \(D_i\) o \(k\)
+        \State dopisz \(D_i\) do \(B\)
+        \State \(k \gets\) liczba linii aktualnego dowodu \(B\)
+    \EndFor
 
+    \If{\(R\) nie wymaga dodatkowej linii pomocniczej}
+        \State dopisz do \(B\) linię stosującą \(R\) do końcowych linii poddowodów
+    \Else
+        \State dopisz odpowiednią linię pomocniczą
+        \State dopisz do \(B\) linię stosującą \(R\) dla linii pomocniczej i końcowych linii poddowodów
+    \EndIf
+    \State \Return \(B\)
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
+Całe odtwarzanie dowodu z drzewa można opisać osobną procedurą. Jeżeli wierzchołek
+typu \texttt{LP} jest rozwiązanym liściem, zwracamy zapisany w nim dowód po usunięciu
+kontekstu bazowego. Jeżeli wierzchołek typu \texttt{LP} został rozwiązany przez jedno
+z rozbić, przechodzimy do tego dziecka typu \texttt{SP} i w nim odtwarzamy dowód. Jeżeli wierzchołek jest typu
+\texttt{SP}, najpierw odtwarzamy dowody wszystkich jego dzieci, a potem sklejamy je
+przy użyciu rozbicia zapisanego w tym wierzchołku.
 
+\begin{algorithm}[H]
+\caption{Odtwarzanie dowodu z drzewa}
+\label{alg:compose-proof}
+\begin{algorithmic}[1]
+\Procedure{OdtworzDowod}{$X$}
+    \If{\(X\) nie jest oznaczony jako udowodniony}
+        \State zgłoś błąd
+    \EndIf
 
+    \If{\(X\) jest liściem typu \texttt{LP}}
+        \State \Return dowód zapisany w \(X\) po usunięciu kontekstu bazowego
+    \EndIf
 
+    \If{\(X\) jest wewnętrznym wierzchołkiem typu \texttt{LP}}
+        \State \(Y\) \(\gets\) udowodnione dziecko \(X\)
+        \State \Return \Call{OdtworzDowod}{$Y$}
+    \EndIf
+
+    \If{\(X\) jest wierzchołkiem typu \texttt{SP}}
+        \State \(L \gets\) pusta lista dowodów
+
+        \For{każde dziecko \(Y\) wierzchołka \(X\)}
+            \State dopisz \Call{OdtworzDowod}{$Y$} do listy \(L\)
+        \EndFor
+
+        \State \Return \Call{Sklej}{$L, X$}
+    \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+W ten sposób procedura sklejania odwraca proces dekompozycji celu. Rozbijanie
+zastępuje jeden problem listą podproblemów, natomiast sklejanie bierze dowody tych
+podproblemów i przy użyciu reguły zapisanej w rozbiciu tworzy dowód problemu
+wyjściowego. Dzięki temu wynik działania całej strategii nie jest jedynie informacją,
+że teza została znaleziona w drzewie poszukiwania, ale konkretnym dowodem zapisanym
+w tej samej notacji tekstowej, która była używana przez parser, weryfikator i model
+językowy.
 
 \chapter{Generowanie korpusu}
+
+\section{Motywacja}
+
+Wykorzystanie strategii opisanych w poprzednim rozdziale wymaga dwóch odpowiednio
+wytrenowanych modeli językowych. Pierwszy z nich ma generować poprawne
+dowody z założeniami, w tym również dowody z pustą listą założeń, drugi zaś
+rozbicia problemów dowodowych na podproblemy. Do ich wytrenowania potrzebne są
+więc duże korpusy danych zawierające przykłady takich dowodów i rozbić zapisane
+w przyjętej notacji tekstowej.
+
+Naturalnym punktem wyjścia byłoby znalezienie gotowej bazy tautologii wraz z ich
+dowodami, a następnie przekształcenie tych dowodów do formatu używanego w
+niniejszej pracy. W praktyce takie podejście okazało się niewystarczające. Większość
+dostępnych zbiorów tautologii ma charakter dydaktyczny: są to zwykle zestawy
+ćwiczeń dla osób uczących się logiki, zawierające co najwyżej kilkadziesiąt
+przykładów. Taka liczba dowodów jest zbyt mała, aby mogła stanowić samodzielny
+korpus treningowy dla modelu językowego. Z tego powodu konieczne było
+wygenerowanie korpusu danych w sposób algorytmiczny.
+
+Ogólny schemat generowania korpusu był następujący. Najpierw przygotowano
+dowody tautologii pochodzących ze skryptu do kursu \emph{Logika dla informatyków}
+na Uniwersytecie Wrocławskim. Następnie dowody te połączono w jeden duży ciąg
+poprawnych linii dowodowych, który dalej rozszerzano przez algorytmiczne dopisywanie
+kolejnych losowych, ale formalnie poprawnych linii.
+
+Z tak otrzymanego dużego ciągu wyłuskiwano następnie dowody tautologii, czyli
+dowody linii kodujących sekwenty o pustym kontekście. Otrzymane dowody były
+dalej przekształcane w przykłady treningowe używane w różnych częściach systemu:
+dowody z założeniami oraz rozbicia problemów dowodowych na podproblemy. Na
+końcu korpusy były iteracyjnie formatowane, filtrowane i uzupełniane na podstawie
+wyników treningu, tak aby model możliwie dobrze uczył się generowania potrzebnych
+fragmentów dowodów. Szczegółowe omówienie poszczególnych etapów znajduje się w
+kolejnych sekcjach tego rozdziału.
+
+\section{Formuły źródłowe i początkowe dowody}
+
+Pierwszy etap generowania korpusu polegał na przygotowaniu początkowego zbioru
+poprawnych dowodów tautologii. Zbiór ten miał pełnić rolę punktu wyjścia dla
+późniejszego algorytmicznego rozszerzania danych.
+
+Na początku przygotowano listę formuł rachunku zdań pochodzących ze skryptu do
+kursu \emph{Logika dla informatyków} na Uniwersytecie Wrocławskim. Część z nich była
+tautologiami, część formułami spełnialnymi, lecz nietautologicznymi, a część formułami
+sprzecznymi. Przy pomocy prostego algorytmu sprawdzania tautologiczności przez
+podstawianie wartości logicznych wybrano formuły tautologiczne. Do listy dodano
+również negacje formuł sprzecznych, ponieważ one także są tautologiami.
+
+Kolejnym etapem było przygotowanie dowodów otrzymanych tautologii. 
+W tym celu wykorzystano zewnętrzny model językowy, któremu przekazano opis używanej
+notacji. Następnie ze względu na możliwość halucynacji modelu generującego dowody 
+każdy dowód został formalnie sprawdzony przy pomocy weryfikatora omawianego w poprzednim rozdziale.
+
+Po weryfikacji początkowe dowody zostały połączone w jeden duży ciąg linii
+dowodowych, który będziemy w dalszej części nazywać "dużym dowodem". Ciąg ten posłużył jako punkt wyjścia dla procedury dalszego
+rozszerzania korpusu.
+\section{Losowe rozszerzanie dużego dowodu}
+
+Kolejnym etapem generowania korpusu było dopisywanie nowych linii do dużego
+dowodu. Ogólna idea tej procedury jest prosta: najpierw losowana jest jedna z reguł
+wnioskowania, a następnie wybierane są wcześniejsze linie, które mogą zostać użyte
+jako argumenty tej reguły. Jeżeli dana reguła wymaga dodatkowego argumentu, który
+nie wynika jednoznacznie z wybranych przesłanek, argument ten jest generowany
+osobno. Przykładowo dla linii postaci
+\[
+\texttt{i. } \varphi \texttt{    assumption}
+\]
+konieczne jest wygenerowanie formuły \(\varphi\).
+
+Najprostszą metodą tej procedury polegałoby na losowym wybieraniu potencjalnych
+argumentów reguły, konstruowaniu kandydackiej linii, a następnie sprawdzaniu, czy
+dowód rozszerzony o tę linię poprawnie się parsuje. Jeśli parsowanie kończyło się
+sukcesem, linia była dopisywana do dużego dowodu; w przeciwnym razie kandydatura
+była odrzucana.
+
+W praktyce takie podejście opierające się na tej ideii okazało się jednak zbyt wolne. Dla części reguł już przy
+stosunkowo niewielkim rozmiarze dużego dowodu prawdopodobieństwo wylosowania
+pasujących argumentów było małe. W efekcie znalezienie jednej poprawnej kandydackiej
+linii mogło wymagać bardzo dużej liczby prób, co znacząco spowalniało cały proces
+generowania danych.
+
+Możliwym rozwiązaniem byłoby wprowadzić maksymalną liczbę prób dla danej reguły i po jej
+przekroczeniu porzucać próbę dopisania linii, przechodząc do losowania następnej
+reguły. Takie rozwiązanie prowadziłoby jednak do niekorzystnego rozkładu przykładów
+w korpusie. Reguły trudniejsze do zastosowania, wymagające spełnienia większej
+liczby warunków, pojawiałyby się znacznie rzadziej, mimo że często są istotne w
+rzeczywistych dowodach. Jednocześnie nadmiernie reprezentowane byłyby reguły
+bardzo proste, takie jak \(\texttt{assumption}\), czy szczególnie trywialne w procesie generacji ale
+rzadko potrzebne w praktyce, takie jak \(\top\texttt{-introduction}\).
+
+Prowadziłoby to do sytuacji szczególnie niekorzystnej z punktu widzenia treningu
+modelu: reguły trudne do nauczenia i ważne dla konstrukcji dowodów byłyby słabo
+reprezentowane w danych, natomiast reguły proste lub mało informacyjne dominowałyby
+w korpusie. Z tego powodu konieczne było zoptymalizowanie samego procesu doboru
+argumentów dla losowanych reguł.
+
+Naturalnym kierunkiem optymalizacji jest zawężenie przestrzeni przeszukiwań, by 
+zwiększyć prawdopodobieństwo wylosowania pasujących argumentów. Np dla reguły 
+
+
+\[
+\begin{array}{l}
+\texttt{j. } \phi \quad \dots \\
+\quad \dots \\
+\texttt{k. } \phi \to \psi \quad \dots \\
+\quad \dots \\
+\texttt{i. } \psi \qquad \texttt{→-elimination, k, j}
+\end{array}
+\]
+
+której zapis w notacji drzewiastej ma postać
+
+$$
+\frac{\Gamma_1 \vdash \varphi \to \psi \qquad \Gamma_2 \vdash \varphi}
+     {\Gamma_1,\Gamma_2 \vdash \psi}\;(\to E)
+$$
+
+chcielibyśmy na początku ograniczyć się do losowania linii, których konkluzja jest implikacją,
+a następnie do linii, której konkluzja jest lewą stroną tej implikacji.
+
+W tym celu linie dużego dowodu są grupowane w kilku słownikach. Pierwszy
+słownik grupuje indeksy linii według typu tezy sekwentu. Kluczami są tu rodzaje formuł, np.
+koniunkcja, alternatywa, negacja, szczególny przypadek podwójnej negacji czy formuła atomowa,
+z kolei wartościami są indeksy linii danego typu.
+Drugi słownik grupuje indeksy według dokładnej postaci tezy. Kluczami są tu konkretne formuły,
+a wartościami indeksy linii, których tezą jest dana formuła. Trzeci słownik grupuje indeksy linii według
+założeń występujących w kontekście. Kluczami są tu formuły, a wartościami indeksy linii, których kontekst zawiera daną formułę.
+Ostatnią pomocniczą strukturą jest zestaw indeksów linii, które mogą być użyte jako przesłanki reguły
+
+$$
+\frac{\Gamma,\neg\varphi \vdash \bot}{\Gamma \vdash \varphi}\;(\mathrm{RAA})
+$$
+
+czyli takich, których tezą jest \(\bot\) i które mają w kontekście formułę będącą negacją.
+
+Słowniki przechowujemy w dwóch wariantach: pierwszy mapuje klucze na listy odpowiednich
+indeksów, drugi z kolei na zbiory. Służy to optymalizacji różnych typów operacji.
+Listy są wygodne do losowania, natomiast zbiory do szybkiego sprawdzania przynależności i wyznaczania przecięć.
+
+Dopisanie linii dla każdej reguły wnioskowania jest w implementacji obsługiwane
+osobno, ponieważ poszczególne reguły wymagają innych warunków doboru przesłanek
+oraz, w niektórych przypadkach, dodatkowych argumentów. Szczegółowe omawianie
+wszystkich tych przypadków nie jest jednak konieczne do zrozumienia ogólnej idei
+generatora. Aby pokazać sposób wykorzystania opisanych słowników, przyjrzymy się
+regule eliminacji alternatywy, która w notacji drzewiastej ma postać
+\[
+\frac{
+    \Gamma_1 \vdash \varphi \vee \psi
+    \qquad
+    \Gamma_2,\varphi \vdash \rho
+    \qquad
+    \Gamma_3,\psi \vdash \rho
+}{
+    \Gamma_1,\Gamma_2,\Gamma_3 \vdash \rho
+}\;(\vee E).
+\]
+zaś w notacji tekstowej ma postać
+
+\[
+\begin{array}{l}
+\texttt{j. } \phi \lor \psi \quad \dots \\
+\quad \dots \\
+\texttt{k. } \rho \quad \dots \\
+\quad \dots \\
+\texttt{l. } \rho \quad \dots \\
+\quad \dots \\
+\texttt{i. } \rho \quad \texttt{\(\lor\)-elimination, j, k, l}
+\end{array}
+\].
+
+Aby dopisać linię przez zastosowanie tej reguły, generator musi znaleźć trzy
+linie o indeksach \texttt{j}, \texttt{k} i \texttt{l} spełniające określone warunki:
+konkluzją pierwszej z nich powinna być alternatywa, druga powinna mieć w kontekście
+lewą stronę tej alternatywy, trzecia powinna mieć w kontekście jej prawą stronę,
+a konkluzje drugiej i trzeciej linii powinny być identyczne.
+
+Bez omawianych słowników znalezienie takiej trójki wymagałoby bardzo wielu prób.
+Liczba możliwych trójek rośnie sześciennie względem liczby linii w dużym dowodzie,
+a jedynie nieliczne z nich spełniają wszystkie wymagane warunki. Użycie słowników
+pozwala znacząco ograniczyć przestrzeń przeszukiwania. Procedura znajdowania
+odpowiednich przesłanek wygląda następująco.
+
+Najpierw losowana jest linia z listy linii, których tezą jest alternatywa.
+Oznaczmy tę tezę jako \(\varphi \vee \psi\). Następnie tworzone są dwa zbiory:
+zbiór tez linii mających w kontekście \(\varphi\) oraz zbiór tez linii mających
+w kontekście \(\psi\). Jeżeli przekrój tych zbiorów jest niepusty, losowana jest
+z niego formuła \(\rho\). W przeciwnym wypadku procedura wraca do wyboru pierwszej
+przesłanki, czyli linii z alternatywą.
+
+Po wybraniu formuły \(\rho\) druga przesłanka losowana jest z przekroju zbioru
+linii mających w kontekście \(\varphi\) oraz zbioru linii, których tezą jest
+\(\rho\). Analogicznie trzecia przesłanka losowana jest z przekroju zbioru linii
+mających w kontekście \(\psi\) oraz zbioru linii, których tezą jest \(\rho\).
+W ten sposób otrzymujemy trójkę linii potrzebnych do zastosowania reguły
+eliminacji alternatywy.
+
+Słowniki pomocnicze oraz sparsowana reprezentacja dużego dowodu są aktualizowane
+inkrementalnie. Po dopisaniu kolejnej poprawnej linii system nie parsuje ponownie
+całego dowodu ani nie buduje od zera struktur pomocniczych. Zamiast tego korzysta
+z reprezentacji uzyskanej w poprzedniej iteracji i uzupełnia ją o informacje
+wynikające z nowej linii: jej sparsowaną postać oraz indeksy potrzebne w odpowiednich
+słownikach.
+
+Koszt tej operacji nie musi być formalnie stały, ponieważ zależy od użytych
+kontenerów i od liczby miejsc, w których należy zapisać informację o nowej linii.
+Jest jednak kosztem lokalnej aktualizacji, a nie ponownego przetwarzania całego
+dowodu, dlatego w praktyce rośnie znacznie wolniej niż koszt każdorazowego
+odtwarzania wszystkich struktur pomocniczych.
+
+Mimo zastosowanych usprawnień, przy dużych dowodach rzędu kilkudziesięciu tysięcy
+linii czas potrzebny na dopisanie kolejnej linii nadal zauważalnie rośnie. Z tego
+powodu procedura generacji uruchamiana jest wielokrotnie i równolegle, w kilku
+wątkach. Wszystkie wątki startują od tych samych początkowych dużych dowodów,
+jednak każdy z nich pracuje na własnej kopii dowodu, rozwijając ją niezależnie od
+pozostałych. Każdde procedura generacji dla jednego dużego dowodu generuje kilkanaście tysięcy liniiz.
+
+\section{Generowanie z dużego dowodu przykładów treningowych}
+
+Same duże dowody nie są bezpośrednio użyteczne jako dane treningowe dla modeli
+językowych. Wynika to z kilku powodów.
+
+Po pierwsze, ich format różni się od formatu przykładów, które model ma później
+generować. W przypadku rozbić celu format rozbić i dużego dowodu jest całkowicie różny, 
+w przypadku dowodów z założeniami w dużych dowodach brakuje lini kodującej cel
+oraz linii kodujących założenia.
+
+Po drugie, linie dużego dowodu powstają w sposób losowy. Oznacza to, że chociaż
+cały ciąg jest formalnie poprawny, to nie stanowi uporządkowanej odpowiedzi na
+konkretny problem dowodowy. Nie zawiera więc bezpośrednio informacji o tym, jakich
+reguł i argumentów należy używać, aby rozwiązać zadany sekwent.
+
+Po trzecie, duże dowody są zbyt długie, aby mogły być w całości przetwarzane przez
+model językowy. Ich długość znacząco przekracza długość kontekstu obsługiwaną przez
+wytrenowane modele. W rezultacie model, widząc późniejszą linię dowodu, nie miałby
+już dostępu do wielu wcześniejszych linii, do których ta linia się odwołuje. Uczenie
+na takich przykładach nie pozwalałoby więc skutecznie nauczyć się doboru argumentów
+dla poszczególnych reguł.
+
+Z tego powodu duże dowody musiały zostać przekształcone do postaci użytecznej
+dla treningu. Proces ten można podzielić na trzy zasadnicze etapy:
+
+\begin{enumerate}[itemsep=0.4em, topsep=0.4em, parsep=0pt]
+    \item \textbf{Wyłuskiwanie dowodów tautologii.}
+    Z dużego dowodu wybierane są linie kodujące sekwenty o pustym kontekście.
+    Każda taka linia odpowiada dowodowi pewnej tautologii. Następnie odtwarzany
+    jest fragment dużego dowodu potrzebny do uzasadnienia tej linii, a otrzymane
+    dowody podlegają dalszej selekcji.
+
+    \item \textbf{Wyłuskiwanie dowodów z założeniami z dowodów bez założeń i formatowanie powstałego w ten sposób korpusu}
+    Z otrzymanych dowodów tautologii dla ich poszczególnych linii generowane są dowody z założeniami oraz
+    rozbicia.
+
+    \item \textbf{Wyłuskiwanie rozbić problemów na podproblemy z dowodów bez założeń i formatowanie powstałego w ten sposób korpusu}
+\end{enumerate}
+
+\subsection{Wyłuskiwanie dowodów tautologii}
+
+Pierwszym etapem wyłuskiwania dowodów tautologii jest sparsowanie dużego dowodu.
+Następnie znajdujemy wszystkie linie, których sekwenty po sparsowaniu mają puste
+konteksty (formuły zapisane w tych liniach są tautologiami). 
+
+Następnie tworzymy zbiór linii użytych w dowodzie tej tautologii.
+początkowo zbiór ten zawiera tylko linię, którą chcemy udowodnić, a następnie dodajemy do
+tego zbioru wszystkie linie, do których odwołuje się ta linia. Potem analogicznie dodajemy linie,
+do których odwołują się nowo dodane linie, i
+powtarzamy ten proces, aż otrzymany zbiór linii będzie zamknięty ze względu na
+odwołania. 
+
+Na końcu wybrane linie sortujemy zgodnie z ich kolejnością w dużym dowodzie, 
+łączymy je w jeden dowód i przenumerowujemy je tak, aby indeksy kolejnych linii 
+były kolejnymi liczbami naturalnymi, zaczynając od \texttt{1}.
+
+W tej fazie dokonujemy również wstępnej selekcji dowodów które nas interesują.
+
+Odrzucamy:
+\begin{enumerate}[itemsep=0.4em, topsep=0.4em, parsep=0pt]
+    \item \textbf{Większość dowodów mających mniej niż 3 linie (zostawiamy losowo około 0.01 ich początkowej liczby).} W szczególności odrzucamy większość jednolinijkowych "dowodów" 
+    tautologii przy użyciu reguł \texttt{TND} i $\top$-\texttt{introduction}. 
+    \item \textbf{Dowody tautologii zawierających symbole \(\bot\) i \(\top\) (zostawiamy losowo około 0.01 ich początkowej liczby).}
+        Tautologie te początkowo miały dość dużą nadreprezentację, a ich dowody często
+        sprowadzały się do mechanicznego wykorzystania własności stałych logicznych, przez
+        co wnosiły niewiele informacji o ogólnych schematach dowodzenia.
+    \item \textbf{Wszystkie dwody mające więcej niż 1024 znaki.} Odrzucono je, ponieważ rozmiar kontekstu trenowanego modelu językowego wynosił \textbf{1024}
+\end{enumerate}
+
+W wygenerowanym zbiorze pojawiało się wiele dowodów tych samych tautologii lub
+tautologii różniących się jedynie nazwami zmiennych. Aby usunąć tego typu
+powtórzenia, dowody grupowano ze względu na znormalizowaną postać dowodzonej
+tautologii. W postaci znormalizowanej pierwsza zmienna występująca w formule od
+lewej była zastępowana przez \texttt{x1}, druga przez \texttt{x2}, trzecia przez
+\texttt{x3} itd. Następnie dla każdej grupy wybierano dowód o najmniejszej liczbie
+linii, a pozostałe dowody odrzucano ze zbioru z którego będziemy generować korpusy uczące.
+
+\subsection{Tworzenie dowodów z założeniami}
+Z otrzymanych dowodów tautologii generuję następnie przykłady dowodów
+sekwentów z założeniami. Każda linia poprawnego dowodu koduje pewien sekwent
+\(\Gamma \vdash \varphi\), a poprzedzające ją linie zawierają jego dowód.
+Będziemy więc odtwarzać dowód \(\varphi\) w kontekście \(\Gamma\).
+
+Dla każdej linii dowodu odtwarzano najpierw fragment potrzebny do jej
+uzasadnienia. Procedura ta przypomina procedurę ekstrakcji dowodów tautologii
+z dużego dowodu. Zaczynała ona od wybranej linii, a następnie dodawała wszystkie
+linie, do których odwołuje się jej uzasadnienie. Następnie analogicznie dodawano
+linie, do których odwołują się nowo dodane linie. Proces powtarzano aż do
+otrzymania zbioru linii zamkniętego ze względu na odwołania. W ten sposób
+z całego dowodu wycinano poddowód wystarczający do uzasadnienia wybranego
+sekwentu. Po wyborze odpowiednie linie były ze sobą sklejane, a ich numeracja
+oraz numeracja odwołań była zmieniana tak, aby numery kolejnych linii były
+kolejnymi liczbami naturalnymi zaczynając od \texttt{1}.
+
+Następnie tworzono zapytanie zgodne z formatem dowodów z kontekstem, używanym
+w korpusie. Zapytanie rozpoczyna się linią, w której po \texttt{Prove that:}
+zapisywana jest formuła, którą chcemy udowodnić. Jeżeli zbiór założeń jest
+niepusty, to w kolejnej linii po tekście \texttt{assuming that:} zapisywane jest
+pierwsze założenie, a kolejne założenia są zapisywane po przecinku w następnych
+liniach.
+
+Po złączeniu części odpowiadającej za definicję problemu i części zawierającej
+dowód otrzymujemy dowód w formacie, który mógłby zostać użyty w korpusie.
+Niestety taki dowód wciąż może zawierać liczne nadmiarowe linie, co utrudniałoby
+modelowi zrozumienie, które kroki faktycznie zbliżają nas do udowodnienia
+sekwentu. W tym celu stosujemy kilka uproszczeń.
+
+Naturalnym pierwszym kierunkiem
+uproszczeń było skorzystanie z jawnego kontekstu problemu. Jeżeli w dowodzie
+pojawiała się linia dowodząca formuły należącej do tego kontekstu, zastępowano
+jej uzasadnienie odwołaniem do kontekstu. W zależności od tego, czy linia miała
+pusty czy niepusty kontekst dodatkowy, używano reguły \texttt{context} dla
+argumentu \texttt{0} albo reguły \texttt{contextWeak}, również dla argumentu
+\texttt{0}. Linia \texttt{0} została zdefiniowana wcześniej jako niezapisana
+wprost linia, której kontekst jest równy kontekstowi bazowemu. Po tych podmianach
+ponownie usuwano linie, które przestały być potrzebne, a cały fragment
+przenumerowywano. W rezultacie powstawał krótszy i bardziej regularny dowód
+z założeniami, lepiej nadający się do treningu modelu.
+
+Może się również zdarzyć, że podczas dowodzenia sekwentu z założeniami jakaś
+linia dowodu, która nie jest ostatnią linią, także koduje sekwent, który chcemy
+udowodnić. Ponieważ dowód może zakończyć się na pierwszej linii kodującej żądany
+sekwent, usuwano wszystkie linie znajdujące się po pierwszym wystąpieniu tego
+sekwentu.
+
+
+Kolejne uproszczenie bazuje na następującej intuicji. Zdefiniujmy indukcyjnie
+zbiór linii ważnych. Niech \(n\) oznacza numer ostatniej linii dowodu \(P\), zaś
+\(\operatorname{Ref}(k,P)\) oznacza zbiór linii, do których odwołuje się linia
+\(k\) w dowodzie \(P\). Przyjmujemy
+\[
+W_{1,P} = \{n\}.
+\]
+Następnie definiujemy
+\[
+W_{i+1,P}
+=
+\bigcup_{k \in W_{i,P}} \operatorname{Ref}(k,P).
+\]
+Ostatecznie niech
+\[
+W_P = \bigcup_{i \in \mathbb{N}} W_{i,P}.
+\]
+Zbiór \(W_P\) zawiera więc ostatnią linię dowodu, linie, do których ona się
+odwołuje, linie, do których odwołują się te linie itd. Innymi słowy są to linie,
+które są potrzebne do uzasadnienia końcowego sekwentu.
+
+Zauważmy, że dowód z założeniami \(P\) pozostanie poprawnym dowodem żądanego
+sekwentu, jeżeli usuniemy z niego wszystkie linie nienależące do \(W_P\), a w
+pozostałych liniach zmienimy numerację linii i odwołań tak, aby numery kolejnych
+linii były kolejnymi liczbami naturalnymi. Linie spoza \(W_P\) nie są bowiem
+wykorzystywane w uzasadnieniu ostatniej linii dowodu.
+
+Konkluzje reguł są często w pewnym sensie podobne do ich przesłanek. Na przykład
+mogą mieć takie same konteksty, konteksty różniące się jedną formułą, albo w
+przypadku reguły \texttt{weakening} tę samą konkluzję. Można więc przypuszczać,
+że w niektórych miejscach dowodu da się zmienić odwołanie do danej linii na
+odwołanie do innej, wcześniejszej linii, nie niszcząc poprawności dowodu. W ten
+sposób, zmieniając numery odwołań, możemy wpływać na rozmiar zbioru \(W_P\). Jeżeli
+po takiej zmianie część późniejszych linii przestanie należeć do \(W_P\), będzie
+można usunąć je z dowodu.
+
+Znalezienie dokładnego algorytmu, który wybierałby odwołania prowadzące do
+najmniejszego możliwego zbioru \(W_P\), wydaje się trudne. Dlatego zastosowano
+prostą heurystykę: jeżeli w każdym odwołaniu będziemy starali się odwoływać do
+jak najwcześniejszej linii, to powinno to sprzyjać zmniejszaniu liczby późnych
+linii należących do \(W_P\). W szczególności późniejsze linie często są wynikiem
+wielu wcześniejszych kroków dowodowych, z których każdy posiada własne odwołania.
+Obecność takiej linii w \(W_P\) może więc pociągać za sobą obecność wielu innych
+linii.
+
+Aby ująć to dokładniej, dla linii \(k\) zdefiniujmy
+\[
+\operatorname{Ref}_1(k,P) = \operatorname{Ref}(k,P),
+\]
+\[
+\operatorname{Ref}_{i+1}(k,P)
+=
+\bigcup_{j \in \operatorname{Ref}_i(k,P)} \operatorname{Ref}(j,P),
+\]
+oraz
+\[
+\overline{\operatorname{Ref}}(k,P)
+=
+\bigcup_{i \in \mathbb{N}} \operatorname{Ref}_{i}(k,P).
+\]
+Zbiór \(\overline{\operatorname{Ref}}(k,P)\) zawiera więc linie, od których linia
+\(k\) zależy pośrednio i bezpośrednio. Intuicyjnie, im większy jest indeks \(k\), tym większa
+jest szansa, że \(\overline{\operatorname{Ref}}(k,P)\) będzie duży. Jeżeli taka
+późna linia należy do \(W_P\), to razem z nią w \(W_P\) znajdą się również linie
+należące do \(\overline{\operatorname{Ref}}(k,P)\). Jest to kolejny powód, dla
+którego preferowane są odwołania do linii pojawiających się w dowodzie możliwie
+wcześnie.
+
+Sama procedura zmian odwołań, ze względu na niewielkie rozmiary treningowych
+dowodów, jest dość prosta. Dla każdego odwołania w dowodzie sprawdzamy, czy
+zmiana wskazywanego indeksu na kolejne liczby naturalne zaczynając od \(0\) nie psuje
+poprawności dowodu. Jeżeli po takiej zmianie dowód nadal przechodzi weryfikację,
+podmiana jest zachowywana. Jako poprawność rozumiemy tutaj zarówno to, że dowód
+pozostaje ciągiem poprawnych kroków, jak i to, że nadal dowodzi żądanego sekwentu.
+Po dokonaniu wszystkich takich zmian (początkowo zmieniamy odwołania w ostatniej linii, 
+następnie idziemy w górę) z dowodu usuwane są linie nienależące do \(W_P\), a
+następnie zmieniana jest numeracja linii i odwołań tak, aby indeksy linii były
+kolejnymi liczbami naturalnymi zaczynając od \texttt{1}. 
+
+\subsection{Tworzenie rozbić sekwentów}
+
+
+Podobnie jak w przypadku generacji dowodów z założeniami, rozbicia
+generujemy z poszczególnych linii dowodu bez założeń. 
+
+Rozbicie składa się z problemu głównego, reguły użytej do jego rozbicia oraz
+listy podproblemów odpowiadających przesłankom tej reguły. Jeżeli dana linia
+dowodu koduje sekwent \(P\) i została uzyskana za pomocą reguły \(R\) z linii
+kodujących przesłanki \(P_1,\ldots,P_n\), to możemy odczytać z niej rozbicie
+problemu \(P\) na podproblemy \(P_1,\ldots,P_n\) za pomocą reguły \(R\).
+
+Jak zdefiniowano w sekcji~\ref{sec:reprezentacja-dowodow}, sparsowany dowód
+jest słownikiem mapującym indeksy linii na odpowiadające im sparsowane linie.
+Każda sparsowana linia zawiera sekwent zapisany w danej linii, regułę użytą do
+jej uzasadnienia oraz indeksy linii, do których odwołuje się to uzasadnienie.
+Mając więc sparsowany dowód oraz wybraną linię tego dowodu, możemy pobrać
+problem główny i regułę bezpośrednio z tej linii, natomiast podproblemy
+otrzymać przez odwołanie się do wcześniejszych linii wskazanych przez jej
+argumenty.
+
+Należy jednak zaznaczyć, że nie każdy indeks występujący w zapisie uzasadnienia
+linii odpowiada rzeczywistej przesłance rozbicia. Jak wyjaśnialiśmy wcześniej w przypadku niektórych reguł
+część indeksów odwołuje się do linii które nie kodują przesłanek ale które są konieczne, żeby 
+odczytać jakiś argument reguły który nie wynika bezpośrednio z przesłanek.
+
+Następnie rozbicia zostały przekonwertowane do formy tekstowej gdzie pierwsza linia składa się z napisu \texttt{Smash: } po
+którym następuje zapis sekwentu który rozbijamy, druga linia składa się z napisu \texttt{With: } po którym następuje nazwa 
+reguły używanej do rozbicia, a zaś trzecia napis \texttt{To: } po którym jeżeli lista podproblemów na które rozbijamy
+sekwent jest niepusta jest zapisana pierwsza przesłanka, z kolei kolejne są zapisywane po przecinku w następnych liniach.
+
+Wadą wygenerowanego korpusu rozbić było to, że konkluzją zdecydowanej większości rozbić przy pomocy reguły 
+$$\frac{\Gamma_1,\varphi \vdash \psi \qquad \Gamma_2,\psi \vdash \varphi}
+     {\Gamma_1,\Gamma_2 \vdash \varphi \leftrightarrow \psi}\;(\leftrightarrow I)$$
+
+formuły $\varphi$ i $\psi$ były identyczne, co przy praktycznym szukaniu dowodów sekwentów logicznych zdarza się
+rzadko. W tym celu dodałem do korpusu rozbicia przy pomocy reguły wyprowadzenia równoważności wygenerowane przez 
+osobny algorytm.
+
+Wartościowaniem zbioru zmiennych nazwijmy funkcję, która zmiennym z tego zbioru przypisuje wartości $\top, \bot$.
+Dla zbioru $n$ zmiennych istnieje $2^n$ wartościowań.
+
+Przyjmijmy, że mamy skończony $n$-elementowy zestaw zmiennych $A$, które będą występować w rozważanych formułach i kontekstach.
+
+Jako $$\operatorname{Sat}(X)$$ zdefiniujmy zbiór wszystkich wartościowań zmiennych z $A$, które spełniają $X$
+jeśli $X$ jest formułą i zbiór wszystkich wartościowań zmiennych z $A$, które spełniają wszystkie 
+formuły w $X$ jeśli $X$ jest kontekstem.
+
+Zauważmy, że $$\operatorname{Sat}(\Gamma,\varphi) = \operatorname{Sat}(\Gamma) \cap \operatorname{Sat}(\varphi)$$
+
+Istotnie, jeżeli jakieś wartościowanie należy do $\operatorname{Sat}(\Gamma,\varphi)$ to musi spełniać zarówno formułę
+$\varphi$ jak i jak i formuły w $\Gamma$ czyli należeć zarówno do $\operatorname{Sat}(\varphi)$ jak i do $\operatorname{Sat}(\Gamma)$, czyli należeć do przecięcia tych zbiorów.
+W drugą stronę, jeżeli wartościowanie należy do $\operatorname{Sat}(\Gamma) \cap \operatorname{Sat}(\varphi)$ to spełnia zarówno formułę $\varphi$ jak i formuły 
+z $Gamma$, czyli należy do $\operatorname{Sat}(\Gamma,\varphi)$.
+
+Zauważmy również, że 
+$$\Gamma \vdash \phi \leftrightarrow \operatorname{Sat}(\Gamma)\subseteq \operatorname{Sat}(\varphi) $$
+
+Istotnie zapis $\Gamma \vdash \phi$ oznacza, że z formuł z $\Gamma$ da się dowieść $\varphi$, co w przypadku rachunku zdań w logice klasycznej jest równoważne
+temu, że jeżeli dla jakiegoś prawdziwe są wszystkie formuły z $\Gamma$ to dlatego wartościowania prawdziwa jest formuła $\varphi$, co jest równoważne z tym, że 
+jeżeli jakieś wartościowanie należy do $\operatorname{Sat}(\Gamma)$ musi należeć do $\operatorname{Sat}(\varphi)$, czyli, że $\operatorname{Sat}(\Gamma)$
+zawiera się w $\operatorname{Sat}(\varphi)$.
+
+Algorytm wygenerowania rozbicia przy pomocy
+$$\frac{\Gamma_1,\varphi \vdash \psi \qquad \Gamma_2,\psi \vdash \varphi}
+     {\Gamma_1,\Gamma_2 \vdash \varphi \leftrightarrow \psi}\;(\leftrightarrow I)$$
+
+będzie polegał, na znalezieniu przesłanek tego rozbicia, by później wywnioskować z nich konkluzję, a potem złączyć konkluzję, przesłanki i rozbicie w sparsowane rozbicie,
+które później sprowadzimy do postaci tekstowej.
+
+Żeby znaleźć przesłanki reguły musimy znaleźć konteksty $\Gamma_1$ i $\Gamma_2$ oraz formuły $\varphi$, $\psi$
+takie, że 
+$$\Gamma_1,\varphi \vdash \psi$$
+oraz
+$$\Gamma_2,\psi \vdash \varphi$$
+Ze wcześniejszych obserwacji wynika, że warunki te są równoważne z
+$$\operatorname{Sat}(\Gamma_1) \cap \operatorname{Sat}(\varphi) \subseteq \operatorname{Sat}(\psi)$$
+oraz
+$$\operatorname{Sat}(\Gamma_2) \cap \operatorname{Sat}(\psi) \subseteq \operatorname{Sat}(\varphi)$$
+
+Na początku nasz algorytm losuje konteksty $\Gamma_1$ i $\Gamma_2$, a następnie w pętli losuje parę formuł $\varphi$ 
+i $\psi$ tak aby spełniały powyższe warunki. Taka para zawsze istnieje dla dowolnych kontekstów 
+$\Gamma_1$ i $\Gamma_2$ np zawsze warunki te spełnia para tautologii, lub formuł sprzecznych. Samo losowanie 
+formuł wydaje się operacją, która wymaga bardzo wielu powtórzeń, jednak ograniczając liczbę różnych zmiennych które 
+mogą występować łącznie w generowanych omawianym algorytmem kontekstach i formułach do $6$ udaje się wygenerować przy pomocy opisywanej metody wiele rozbić w stosunkowo krótkim czasie.
+
+Kolejnym problemem jest to, że nie zawsze wymagane właściwości przesłanek i konkluzji w wygenerowanych na tym etapie danych
+przekładają się na proste tekstowe wzorce w łatwo identyfikowane przez modele językowe. Na przykład weźmy regułę
+
+$$
+\displaystyle
+\frac{\Gamma_1 \vdash \varphi \vee \psi \qquad \Gamma_2,\varphi \vdash \rho \qquad \Gamma_3,\psi \vdash \rho}
+     {\Gamma_1,\Gamma_2,\Gamma_3 \vdash \rho}\;(\vee E)
+$$
+
+Przykład jej użycia w notacji drzewiastej mógłby wyglądać następująco
+
+$$
+\displaystyle
+\frac{a \wedge h \vdash a \vee b \qquad a , c \wedge d, f \vdash c \qquad c,b,e \vdash c}
+     {c \wedge d, e, c, f, a\wedge h \vdash c}\;(\vee E)
+$$
+co w notacji zapisu rozbić przekładało by się na następujący tekst:
+\[
+\begin{array}{l}
+\texttt{Smash: c}\wedge \texttt{d, e, c, f, a } \vdash \texttt{ c}\\
+\texttt{With: DisjunctionElimination} \\
+\texttt{To: a}\wedge\texttt{h } \vdash \texttt{ a} \vee \texttt{b,}\\
+\texttt{a, c}\wedge\texttt{d, f } \vdash  \texttt{ c,} \\
+\texttt{c, b, e }\vdash \texttt{ c}
+\end{array}
+\]
+
+Z podanego napisu trudno wywnioskować na pierwszy rzut oka jakikolwiek regularność. Jednocześnie zauważmy, że przy generacji rozbicia przy pomocy
+eliminacji alternatywy, generujemy również poprawne rozbicia jeśli założymy, że $\Gamma_1$, $\Gamma_2$, $\Gamma_3$ są takie same i równe ich sumie 
+a wtedy jeżeli zachowamy odpowiednią kolejność wypisywania przesłanek sekwentów (co zapewniamy odpowiednią implementacją działań na kontekstach) możemy zamienić powyższy zapis rozbicia na 
+\[
+\begin{array}{l}
+\texttt{Smash: c}\wedge \texttt{d, e, c, f, a}\wedge\texttt{h } \vdash \texttt{ c}\\
+\texttt{With: DisjunctionElimination} \\
+\texttt{To: c}\wedge \texttt{d, e, c, f, a}\wedge\texttt{h }\vdash\texttt{ a}\vee\texttt{b}\\
+\texttt{c}\wedge \texttt{d, e, c, f, a}\wedge\texttt{h, a} \vdash  \texttt{ c,} \\
+\texttt{c}\wedge \texttt{d, e, c, f, a}\wedge\texttt{h, b}\vdash \texttt{ c}
+\end{array}
+\]
+gdzie wzorzec jest dużo bardziej zauważalny. Konteksty konkluzji i przesłanek są niemal identyczne i w przypadku dwóch ostatnich przesłanek różnią się jedynie jedną formułą na końcu.
+
+Aby możliwie uprościć modelowi znajdowanie porządanych wzroców nalogiczne przekształcenia, których celem jest możliwie regularny zapis rozbicia definiujemy dla rozbić przy pomocy pozostałych reguł. 
+Transformacje te polegają, na dodaniu do kontekstów przesłanek rozbicia pewne,
+być może puste, zbiory formuł i ustawieniu formuł w kontekstach w odpowiedniej kolejności. Transformacja to odbywa się w taki sposób, aby
+jeżeli początkowe rozbicie było poprawne (to znaczy pasowało do schematu reguły i miało w przesłankach sekwenty tautologiczne) otrzymane po transformacji
+rozbicie nadal było poprawne a także miało tą samą regułę i konkluzję co przed transformacją. Transformacje te stosujemy do wszystkich rozbić w korpusie.
+
+
+Ostatnim etapem formatowania korpusu rozbić jest modyfikacja częstości występowania rozbić tworzonych przez poszczególne reguły. W korpusie który wygenerowaliśmy do tej pory
+częstość występowania rozbić generowanych przez niektóre reguły znacznie przewyższała częstości innych, przez co model często używał częściej występujących reguł bez
+nawet w sytuacjach w których nie były one użyteczne. Co więcej ideą rozbić jest to, by rozbijały problemy na podproblemy prostsze, a dobrą heurystyką na to czy dany problem jest prostszy
+czy trudniejszy jest długość jego konkluzji. Niektóre reguły rozbijają swoją konkluzję na przesłanki których konkluzje są dłuższe 
+niż konkluzja konkluzji reguły (chcielibyśmy mieć ich mniej w korpusie) na przykład
+$$\frac{\Gamma \vdash \varphi}{\Gamma \vdash \varphi \vee \psi}\;(\vee I_1)$$
+inne zaś rozbijają konkluzję reguły na przesłanki o konkluzjach krótszych niż konkluzje konkluzji reguły (chcielibyśmy mieć ich więcej w korpusie)
+na przykład
+$$\frac{\Gamma_1 \vdash \varphi \qquad \Gamma_2 \vdash \psi}{\Gamma_1,\Gamma_2 \vdash \varphi \wedge \psi}\;(\wedge I)$$
+ 
+W tym celu rozbicia w korpusie grupujemy ze względu na reguły w nich występujące, a następnie wielokrotnie losujemy z intuicyjnie 
+ustalonym rozkładem regułę generującą rozbicie, a następnie jednostajnie losujemy rozbicie ze zbioru rozbić generowanych przez
+tą regułę i dodajemy je do nowego korpusu. W ten sposób powstaje ostateczna wersja danych treningowych dla modelu odpowiadającego za rozbicia.
+
+\section{Losowe rozszerzanie dużego dowodu}
+
+\section{Wyłuskiwanie dowodów tautologii}
+
+\section{Normalizacja formuł i usuwanie powtórzeń}
+
+\section{Generowanie problemów pomocniczych}
+
+\section{Generowanie smashy}
+
+\section{Normalizacja kontekstów w smashach}
+
+\section{Równoważność jako przypadek specjalny}
+
+\section{Walidacja i czyszczenie korpusu}
+
+\section{Podsumowanie}
 
 \chapter{Trenowanie i kożystanie z modelu (NanoGPTBundle i te wszystkie funkcje z nim związane !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!, podkreślam WSZYSTKIE(liczenie prawdopodobieństwa, dodawanie tokenu, linii, trenowanie, dotrenowanie, ładowanie)!!!!)}
 

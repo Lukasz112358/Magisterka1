@@ -1909,7 +1909,8 @@ def is_smashed_correctly(SP):
     Problem_unnormalised_main = unnormalize_subproblem(SP.problem)
     for i in SP.subproblems:
         if not is_LP_tautology(i):
-            raise ValueError('Bad arguments')
+            pass
+            #raise ValueError('Bad arguments')
         unnormalised_subproblems.append(unnormalize_subproblem(i))
     match SP.rule:
         case Assumption():
